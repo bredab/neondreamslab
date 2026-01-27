@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Moire Pattern Generator v1.0.0</title>
+    <title>Moire Pattern Generator v1.0.1</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -320,7 +320,7 @@
 <div id="app-wrapper">
     <!-- LEFT SIDE: CONTROLS -->
     <div id="controls">
-        <h1>Moire Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.0</span></h1>
+        <h1>Moire Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.1</span></h1>
         
         <div class="control-group">
             <div class="label-row">
@@ -329,7 +329,7 @@
             </div>
             <div class="input-row">
                 <button class="step-btn" onclick="adjustValue('waves', -1)">-</button>
-                <input type="range" id="waves" min="1" max="100" step="0.1" value="42">
+                <input type="range" id="waves" min="20" max="100" step="0.1" value="42">
                 <button class="step-btn" onclick="adjustValue('waves', 1)">+</button>
             </div>
         </div>
@@ -353,7 +353,7 @@
             </div>
             <div class="input-row">
                 <button class="step-btn" onclick="adjustValue('rad', -1)">-</button>
-                <input type="range" id="rad" min="1" max="150" step="1" value="40">
+                <input type="range" id="rad" min="10" max="60" step="1" value="40">
                 <button class="step-btn" onclick="adjustValue('rad', 1)">+</button>
             </div>
         </div>
@@ -365,7 +365,7 @@
             </div>
             <div class="input-row">
                 <button class="step-btn" onclick="adjustValue('prec', -1)">-</button>
-                <input type="range" id="prec" min="0.0" max="0.999" step="0.001" value="0.95">
+                <input type="range" id="prec" min="0.9" max="0.999" step="0.001" value="0.95">
                 <button class="step-btn" onclick="adjustValue('prec', 1)">+</button>
             </div>
         </div>
