@@ -2,8 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <!-- PWA capable tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Moire Pattern Generator v1.0.0</title>
     <style>
         :root {
@@ -25,8 +29,55 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            /* Use dvh (dynamic viewport height) for mobile browsers */
             min-height: 100vh;
-            overflow: auto;
+            min-height: 100dvh; 
+            overflow: hidden; 
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #rotate-warning { display: none; }
+
+        /* Fullscreen button */
+        #fullscreen-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            z-index: 1000;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        #fullscreen-btn:hover {
+            background: var(--accent-color);
+        }
+
+        /* Force landscape on mobile */
+        @media screen and (orientation: portrait) {
+            #app-wrapper, #fullscreen-btn { display: none !important; }
+            
+            #rotate-warning {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                background: #111;
+                color: #fff;
+                font-family: Arial, sans-serif;
+                text-align: center;
+                z-index: 9999;
+                padding: 20px;
+                box-sizing: border-box;
+            }
         }
 
         #app-wrapper {
@@ -36,18 +87,70 @@
             border-radius: 16px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.6);
             gap: 20px;
+            width: 100%;
             max-width: 1200px;
+            /* Constrain height to fit in viewport with some margin */
+            max-height: 95vh;
+            max-height: 95dvh;
             border: 1px solid var(--border-color);
+            box-sizing: border-box;
+            flex-direction: row;
+            align-items: stretch;
         }
 
         /* --- LEFT PANEL --- */
         #controls {
             width: 320px;
+            min-width: 300px;
             display: flex;
             flex-direction: column;
             gap: 15px;
             padding-right: 10px;
             border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            box-sizing: border-box;
+            padding-left: 0;
+        }
+
+        /* --- CANVAS CONTAINER --- */
+        #canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative; 
+            min-width: 0; 
+            min-height: 0;
+        }
+
+        canvas { 
+            /* Let the canvas size itself based on parent, not internal buffer */
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Keep aspect ratio visually */
+            max-width: 100%;
+            max-height: 100%;
+            background: #000; 
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 1px solid #000;
+            display: block;
+        }
+
+        #watermark {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none; 
+            user-select: none;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
         }
 
         h1 {
@@ -83,7 +186,6 @@
             font-weight: bold;
         }
 
-        /* --- STEPPER & SLIDER STYLING --- */
         .input-row {
             display: flex;
             align-items: center;
@@ -113,15 +215,45 @@
         button.step-btn:active {
             transform: scale(0.95);
         }
-
-        input[type=range] {
-            -webkit-appearance: none; 
-            width: 100%; 
-            background: transparent; 
+        
+        /* Export Buttons */
+        .export-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        
+        button.export-btn {
+            flex: 1;
+            background: var(--panel-bg);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        button.export-btn:hover {
+            background: var(--accent-color);
+            color: white;
         }
 
-        input[type=range]::-webkit-slider-thumb {
+        /* Custom Range Slider */
+        input[type="range"] {
+            -webkit-appearance: none; 
+            appearance: none;
+            width: 100%; 
+            background: transparent; 
+            height: 20px; 
+            margin: 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
+            appearance: none;
             height: 16px;
             width: 16px;
             border-radius: 50%;
@@ -131,15 +263,16 @@
             box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
         }
 
-        input[type=range]::-webkit-slider-runnable-track {
+        input[type="range"]::-webkit-slider-runnable-track {
             width: 100%;
             height: 4px;
             cursor: pointer;
             background: var(--border-color);
             border-radius: 2px;
+            transform: translateY(8px); 
         }
 
-        /* --- INFO BOX --- */
+         /* --- INFO BOX --- */
         .info-box {
             font-size: 12px;
             color: var(--text-muted);
@@ -151,19 +284,38 @@
             line-height: 1.4;
         }
 
-        /* --- CANVAS --- */
-        canvas { 
-            width: 800px; 
-            height: 800px; 
-            background: #000; 
-            border-radius: 8px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
-            border: 1px solid #000;
-            display: block;
+        /* --- RESPONSIVE TWEAKS FOR MOBILE LANDSCAPE --- */
+        @media screen and (max-width: 900px) and (orientation: landscape) {
+            body { padding: 5px; }
+            #app-wrapper {
+                padding: 10px;
+                gap: 10px;
+                max-height: 98dvh;
+            }
+             #controls { 
+                width: 260px; 
+                min-width: 260px;
+                gap: 10px;
+                padding-left: 30px; 
+                border-left: 1px solid rgba(255,255,255,0.05);
+            }
+            h1 {
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+            .control-group { padding: 8px; }
         }
     </style>
 </head>
 <body>
+
+<div id="rotate-warning">
+    <div style="font-size: 50px; margin-bottom: 20px;">🔄</div>
+    <h2>Please Rotate Your Device</h2>
+    <p>This experiment requires landscape mode.</p>
+</div>
+
+<button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
 
 <div id="app-wrapper">
     <!-- LEFT SIDE: CONTROLS -->
@@ -229,6 +381,17 @@
                 <button class="step-btn" onclick="adjustValue('alpha', 1)">+</button>
             </div>
         </div>
+        
+        <!-- EXPORT SECTION -->
+        <div class="control-group">
+            <div class="label-row">
+                <span>Save Image</span>
+            </div>
+            <div class="export-row">
+                <button class="export-btn" onclick="downloadImage('png')">PNG</button>
+                <button class="export-btn" onclick="downloadImage('jpg')">JPG</button>
+            </div>
+        </div>
 
         <div class="info-box">
             Real-time GLSL calculation based on wave height (Z).<br><br>
@@ -239,16 +402,22 @@
     </div>
 
     <!-- RIGHT SIDE: CANVAS -->
-    <canvas id="glcanvas" width="800" height="800"></canvas>
+    <div id="canvas-container">
+        <canvas id="glcanvas" width="800" height="800"></canvas>
+        <div id="watermark">neondreamslab.com</div>
+    </div>
 </div>
 
 <script>
     const canvas = document.getElementById('glcanvas');
-    // Eredeti kontextus beállítások megőrzése
+    const container = document.getElementById("canvas-container");
+
+    // Eredeti kontextus beállítások + preserveDrawingBuffer
     const gl = canvas.getContext('webgl', { 
         alpha: false, 
         depth: false,
-        antialias: false 
+        antialias: false,
+        preserveDrawingBuffer: true 
     });
 
     if (!gl) { alert("Your browser does not support WebGL."); }
@@ -425,7 +594,6 @@
         valDisp.alpha.innerText = parseFloat(ui.alpha.value).toFixed(2);
 
         // Renderelés
-        gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -440,6 +608,79 @@
 
         requestAnimationFrame(update);
     }
+    
+    /* --- RESIZE HANDLER --- */
+    function resize() {
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        const size = Math.min(w, h);
+
+        const newWidth = Math.floor(size);
+        const newHeight = Math.floor(size);
+
+        if (canvas.width !== newWidth || canvas.height !== newHeight) {
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+    }
+
+    /* --- FULLSCREEN TOGGLE --- */
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+    
+    /* --- IMAGE DOWNLOAD --- */
+    window.downloadImage = function(format) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        
+        ctx.drawImage(canvas, 0, 0);
+        
+        ctx.save();
+        ctx.font = "bold 20px monospace";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+
+        ctx.fillText("neondreamslab.com", tempCanvas.width - 20, tempCanvas.height - 15);
+        ctx.restore();
+        
+        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+        const link = document.createElement('a');
+        link.download = `moire_pattern_${Date.now()}.${format}`;
+        link.href = tempCanvas.toDataURL(mimeType, 0.9);
+        link.click();
+    };
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', function() {
+        setTimeout(resize, 200);
+        setTimeout(resize, 500);
+    });
+
+    setTimeout(resize, 100);
+    resize();
 
     update();
 
