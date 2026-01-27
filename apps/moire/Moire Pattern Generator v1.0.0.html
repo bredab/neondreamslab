@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Moire Pattern Generator v1.0.0</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --border-color: #334155;
+            --input-bg: #0f172a;
+        }
+
+        body { 
+            margin: 0; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: var(--text-main); 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: auto;
+        }
+
+        #app-wrapper {
+            display: flex;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            gap: 20px;
+            max-width: 1200px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* --- LEFT PANEL --- */
+        #controls {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 10px;
+            border-right: 1px solid var(--border-color);
+        }
+
+        h1 {
+            margin: 0 0 15px 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .value-display {
+            color: var(--accent-color);
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* --- STEPPER & SLIDER STYLING --- */
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.step-btn {
+            background: var(--border-color);
+            color: var(--text-main);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            line-height: 1;
+            transition: background 0.2s;
+        }
+
+        button.step-btn:hover {
+            background: var(--accent-color);
+        }
+
+        button.step-btn:active {
+            transform: scale(0.95);
+        }
+
+        input[type=range] {
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: transparent; 
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            margin-top: -6px; 
+            box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        /* --- INFO BOX --- */
+        .info-box {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: auto;
+            border: 1px solid var(--border-color);
+            line-height: 1.4;
+        }
+
+        /* --- CANVAS --- */
+        canvas { 
+            width: 800px; 
+            height: 800px; 
+            background: #000; 
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 1px solid #000;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-wrapper">
+    <!-- LEFT SIDE: CONTROLS -->
+    <div id="controls">
+        <h1>Moire Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.0</span></h1>
+        
+        <div class="control-group">
+            <div class="label-row">
+                <span>Wave Density</span>
+                <span id="val_waves" class="value-display">42</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('waves', -1)">-</button>
+                <input type="range" id="waves" min="1" max="100" step="0.1" value="42">
+                <button class="step-btn" onclick="adjustValue('waves', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Rotation (deg)</span>
+                <span id="val_rot" class="value-display">0</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('rot', -1)">-</button>
+                <input type="range" id="rot" min="-180" max="180" step="0.1" value="0">
+                <button class="step-btn" onclick="adjustValue('rot', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Point Radius</span>
+                <span id="val_rad" class="value-display">40</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('rad', -1)">-</button>
+                <input type="range" id="rad" min="1" max="150" step="1" value="40">
+                <button class="step-btn" onclick="adjustValue('rad', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Precision / Threshold</span>
+                <span id="val_prec" class="value-display">0.95</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('prec', -1)">-</button>
+                <input type="range" id="prec" min="0.0" max="0.999" step="0.001" value="0.95">
+                <button class="step-btn" onclick="adjustValue('prec', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Brightness / Alpha</span>
+                <span id="val_alpha" class="value-display">0.5</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('alpha', -1)">-</button>
+                <input type="range" id="alpha" min="0.01" max="1.0" step="0.01" value="0.5">
+                <button class="step-btn" onclick="adjustValue('alpha', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="info-box">
+            Real-time GLSL calculation based on wave height (Z).<br><br>
+            <span style="color: #60a5fa">Blue</span> = Low Intensity<br>
+            <span style="color: #4ade80">Green</span> = Medium<br>
+            <span style="color: #f87171">Red</span> = High (Peaks)
+        </div>
+    </div>
+
+    <!-- RIGHT SIDE: CANVAS -->
+    <canvas id="glcanvas" width="800" height="800"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('glcanvas');
+    // Eredeti kontextus beállítások megőrzése
+    const gl = canvas.getContext('webgl', { 
+        alpha: false, 
+        depth: false,
+        antialias: false 
+    });
+
+    if (!gl) { alert("Your browser does not support WebGL."); }
+
+    // =============================================================
+    // VERTEX SHADER (UNCHANGED)
+    // =============================================================
+    const vsSource = `
+        attribute vec2 a_position;
+        
+        uniform float u_waves;
+        uniform float u_rot;
+        uniform float u_prec;
+        uniform float u_pointSize;
+        uniform vec2 u_resolution;
+
+        varying vec3 v_color; 
+        varying float v_discard;
+
+        vec3 palette(float t) {
+            float r = smoothstep(0.5, 0.8, t);
+            float g = smoothstep(0.2, 0.7, t) - smoothstep(0.8, 1.0, t); 
+            float b = smoothstep(0.0, 0.4, t) - smoothstep(0.6, 1.0, t);
+            return vec3(r, g, b);
+        }
+
+        void main() {
+            float xres = u_resolution.x;
+            vec2 pos = a_position * (xres / 2.0); 
+
+            float PI = 3.14159265359;
+            float fact1 = (xres / u_waves) / (2.0 * PI);
+
+            float s = pos.x * cos(u_rot) + pos.y * sin(u_rot);
+            float t = pos.y * cos(u_rot) - pos.x * sin(u_rot);
+
+            float z = (sin(s / fact1 + PI / 2.0) + sin(t / fact1 + PI / 2.0)) / 2.0;
+
+            if (z >= u_prec) {
+                float z_norm = (z - u_prec) / (1.0 - u_prec);
+                
+                vec3 baseColor = vec3(0.0);
+                baseColor.b = smoothstep(0.0, 0.4, z_norm); 
+                baseColor.g = smoothstep(0.3, 0.7, z_norm);
+                baseColor.r = smoothstep(0.6, 1.0, z_norm);
+
+                v_color = baseColor;
+                
+                gl_Position = vec4(a_position, 0.0, 1.0);
+                gl_PointSize = u_pointSize;
+                v_discard = 0.0;
+            } else {
+                gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+                gl_PointSize = 0.0;
+                v_discard = 1.0;
+            }
+        }
+    `;
+
+    // =============================================================
+    // FRAGMENT SHADER (UNCHANGED)
+    // =============================================================
+    const fsSource = `
+        precision mediump float;
+        
+        uniform float u_alpha;
+        varying vec3 v_color;
+        varying float v_discard;
+
+        void main() {
+            if (v_discard > 0.5) discard;
+
+            vec2 coord = 2.0 * gl_PointCoord - 1.0;
+            float dist = length(coord);
+            if (dist > 1.0) discard;
+
+            float glow = pow(1.0 - dist, 2.0);
+
+            gl_FragColor = vec4(v_color * glow, u_alpha);
+        }
+    `;
+
+    function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            return null;
+        }
+        return shader;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    // --- Rács generálása ---
+    const pointData = [];
+    const steps = 500; 
+    for (let y = 0; y < steps; y++) {
+        for (let x = 0; x < steps; x++) {
+            pointData.push((x / steps) * 2 - 1, (y / steps) * 2 - 1);
+        }
+    }
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pointData), gl.STATIC_DRAW);
+
+    const posLoc = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const locs = {
+        waves: gl.getUniformLocation(program, 'u_waves'),
+        rot: gl.getUniformLocation(program, 'u_rot'),
+        prec: gl.getUniformLocation(program, 'u_prec'),
+        size: gl.getUniformLocation(program, 'u_pointSize'),
+        res: gl.getUniformLocation(program, 'u_resolution'),
+        alpha: gl.getUniformLocation(program, 'u_alpha')
+    };
+
+    // Eredeti Blend beállítások
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+    // --- UI Kezelés az új szerkezethez ---
+    const ui = {
+        waves: document.getElementById('waves'),
+        rot: document.getElementById('rot'),
+        rad: document.getElementById('rad'),
+        prec: document.getElementById('prec'),
+        alpha: document.getElementById('alpha')
+    };
+    
+    const valDisp = {
+        waves: document.getElementById('val_waves'),
+        rot: document.getElementById('val_rot'),
+        rad: document.getElementById('val_rad'),
+        prec: document.getElementById('val_prec'),
+        alpha: document.getElementById('val_alpha')
+    };
+
+    // Helper for stepping buttons
+    window.adjustValue = function(id, direction) {
+        const input = document.getElementById(id);
+        const step = parseFloat(input.step) || 1;
+        const current = parseFloat(input.value);
+        const min = parseFloat(input.min);
+        const max = parseFloat(input.max);
+        
+        let newVal = current + (step * direction);
+        
+        // Clamp value
+        if (newVal < min) newVal = min;
+        if (newVal > max) newVal = max;
+
+        // Fix float precision issues
+        if (step < 1) {
+            newVal = parseFloat(newVal.toFixed(3));
+        }
+
+        input.value = newVal;
+    };
+
+    function update() {
+        // UI érték kijelzők frissítése
+        valDisp.waves.innerText = ui.waves.value;
+        valDisp.rot.innerText   = parseFloat(ui.rot.value).toFixed(1);
+        valDisp.rad.innerText   = ui.rad.value;
+        valDisp.prec.innerText  = parseFloat(ui.prec.value).toFixed(3);
+        valDisp.alpha.innerText = parseFloat(ui.alpha.value).toFixed(2);
+
+        // Renderelés
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.uniform1f(locs.waves, parseFloat(ui.waves.value));
+        gl.uniform1f(locs.rot, parseFloat(ui.rot.value) * (Math.PI / 180.0));
+        gl.uniform1f(locs.prec, parseFloat(ui.prec.value));
+        gl.uniform1f(locs.size, parseFloat(ui.rad.value));
+        gl.uniform1f(locs.alpha, parseFloat(ui.alpha.value));
+        gl.uniform2f(locs.res, canvas.width, canvas.height);
+
+        gl.drawArrays(gl.POINTS, 0, pointData.length / 2);
+
+        requestAnimationFrame(update);
+    }
+
+    update();
+
+</script>
+</body>
+</html>

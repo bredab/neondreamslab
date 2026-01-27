@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <!-- PWA capable tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Simple Pattern Generator v1.0.1</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --border-color: #334155;
+            --input-bg: #0f172a;
+        }
+
+        body { 
+            margin: 0; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: var(--text-main); 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Use dvh (dynamic viewport height) for mobile browsers */
+            min-height: 100vh;
+            min-height: 100dvh; 
+            overflow: hidden; 
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+		#rotate-warning { display: none; }
+
+        /* Fullscreen button */
+        #fullscreen-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            z-index: 1000;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        #fullscreen-btn:hover {
+            background: var(--accent-color);
+        }
+
+        /* Force landscape on mobile */
+        @media screen and (orientation: portrait) {
+            #app-wrapper, #fullscreen-btn { display: none !important; }
+            
+            #rotate-warning {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                background: #111;
+                color: #fff;
+                font-family: Arial, sans-serif;
+                text-align: center;
+                z-index: 9999;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+        }
+
+        #app-wrapper {
+            display: flex;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            /* Constrain height to fit in viewport with some margin */
+            max-height: 95vh;
+            max-height: 95dvh;
+            border: 1px solid var(--border-color);
+            box-sizing: border-box;
+            flex-direction: row;
+            align-items: stretch;
+        }
+
+        /* --- LEFT PANEL --- */
+        #controls {
+            width: 320px;
+            min-width: 300px; 
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 10px;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            box-sizing: border-box;
+            /* Scroll handle area on the left */
+            padding-left: 0; 
+        }
+
+        /* --- CANVAS CONTAINER --- */
+        #canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative; 
+            min-width: 0; 
+            min-height: 0;
+        }
+
+        canvas { 
+            /* Let the canvas size itself based on parent, not internal buffer */
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Keep aspect ratio visually */
+            
+            max-width: 100%;
+            max-height: 100%;
+            
+            background: #000; 
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 1px solid #000;
+            display: block;
+        }
+
+        #watermark {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none; 
+            user-select: none;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        h1 {
+            margin: 0 0 15px 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .value-display {
+            color: var(--accent-color);
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.step-btn {
+            background: var(--border-color);
+            color: var(--text-main);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            line-height: 1;
+            transition: background 0.2s;
+        }
+
+        button.step-btn:hover {
+            background: var(--accent-color);
+        }
+
+        button.step-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Export Buttons */
+        .export-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        
+        button.export-btn {
+            flex: 1;
+            background: var(--panel-bg);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        button.export-btn:hover {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* Custom Range Slider */
+        input[type="range"] {
+            -webkit-appearance: none; 
+            appearance: none;
+            width: 100%; 
+            background: transparent; 
+            /* Increase touch area height for better usability but keep track thin visually */
+            height: 20px; 
+            margin: 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            margin-top: -6px; /* relative to track height if using custom track */
+            box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-color);
+            border-radius: 2px;
+            /* Vertically center the track */
+            transform: translateY(8px); 
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            height: 16px;
+            width: 16px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .color-label-r { color: #f87171 !important; }
+        .color-label-g { color: #4ade80 !important; }
+        .color-label-b { color: #60a5fa !important; }
+
+        /* --- RESPONSIVE TWEAKS FOR MOBILE LANDSCAPE --- */
+        @media screen and (max-width: 900px) and (orientation: landscape) {
+            body {
+                padding: 5px; /* Minimal padding on mobile */
+            }
+            #app-wrapper {
+                padding: 10px;
+                gap: 10px;
+                max-height: 98dvh; /* Use almost full height */
+            }
+             #controls { 
+                width: 260px; 
+                min-width: 260px;
+                gap: 10px;
+                /* SAFETY SCROLL AREA ON THE LEFT */
+                padding-left: 30px; 
+                border-left: 1px solid rgba(255,255,255,0.05); /* Visual cue */
+            }
+            h1 {
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+            .control-group {
+                padding: 8px;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+
+<div id="rotate-warning">
+        <div style="font-size: 50px; margin-bottom: 20px;">🔄</div>
+        <h2>Please Rotate Your Device</h2>
+        <p>This experiment requires landscape mode.</p>
+</div>
+
+<button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
+
+<div id="app-wrapper">
+    <!-- LEFT SIDE: CONTROLS -->
+    <div id="controls">
+        <h1>Simple Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.1</span></h1>
+        
+        <div class="control-group">
+            <div class="label-row">
+                <span>Grid Density</span>
+                <span id="val_density" class="value-display">10</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('density', -1)">-</button>
+                <input type="range" id="density" min="1" max="50" value="10" step="0.1">
+                <button class="step-btn" onclick="adjustValue('density', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Radius</span>
+                <span id="val_radius" class="value-display">0.60</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('radius', -1)">-</button>
+                <input type="range" id="radius" min="0.1" max="2.0" value="0.6" step="0.01">
+                <button class="step-btn" onclick="adjustValue('radius', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Rotation (deg)</span>
+                <span id="val_rotation" class="value-display">0</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('rotation', -1)">-</button>
+                <input type="range" id="rotation" min="0" max="90" value="0" step="0.1">
+                <button class="step-btn" onclick="adjustValue('rotation', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span class="color-label-r">Red Offset</span>
+                <span id="val_offR" class="value-display">0.00</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('offsetR', -1)">-</button>
+                <input type="range" id="offsetR" min="0" max="2.0" value="0.0" step="0.01">
+                <button class="step-btn" onclick="adjustValue('offsetR', 1)">+</button>
+            </div>
+
+            <div class="label-row" style="margin-top: 10px;">
+                <span class="color-label-g">Green Offset</span>
+                <span id="val_offG" class="value-display">0.30</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('offsetG', -1)">-</button>
+                <input type="range" id="offsetG" min="0" max="2.0" value="0.3" step="0.01">
+                <button class="step-btn" onclick="adjustValue('offsetG', 1)">+</button>
+            </div>
+
+            <div class="label-row" style="margin-top: 10px;">
+                <span class="color-label-b">Blue Offset</span>
+                <span id="val_offB" class="value-display">0.60</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('offsetB', -1)">-</button>
+                <input type="range" id="offsetB" min="0" max="2.0" value="0.6" step="0.01">
+                <button class="step-btn" onclick="adjustValue('offsetB', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Contrast (Gamma)</span>
+                <span id="val_gamma" class="value-display">1.0</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('gamma', -1)">-</button>
+                <input type="range" id="gamma" min="0.1" max="3.0" value="1.0" step="0.1">
+                <button class="step-btn" onclick="adjustValue('gamma', 1)">+</button>
+            </div>
+        </div>
+        
+        <!-- EXPORT SECTION -->
+        <div class="control-group">
+            <div class="label-row">
+                <span>Save Image</span>
+            </div>
+            <div class="export-row">
+                <button class="export-btn" onclick="downloadImage('png')">PNG</button>
+                <button class="export-btn" onclick="downloadImage('jpg')">JPG</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT SIDE: CANVAS -->
+    <div id="canvas-container">
+        <canvas id="glCanvas" width="800" height="800"></canvas>
+        <div id="watermark">neondreamslab.com</div>
+    </div>
+</div>
+
+<!-- SHADERS (UNCHANGED FUNCTIONALITY) -->
+<script id="vertex-shader" type="x-shader/x-vertex">
+    attribute vec2 position;
+    void main() {
+        gl_Position = vec4(position, 0.0, 1.0);
+    }
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+    precision highp float;
+
+    uniform vec2 u_resolution;
+    uniform float u_density;
+    uniform float u_radius;
+    uniform float u_rotation; 
+    uniform vec3 u_color_offset; 
+    uniform float u_gamma;
+
+    vec2 rotate(vec2 uv, float angle) {
+        float s = sin(angle);
+        float c = cos(angle);
+        return vec2(uv.x * c - uv.y * s, uv.x * s + uv.y * c);
+    }
+
+    float getSphereHeight(vec2 center, vec2 pixelPos, float radius) {
+        float dist = distance(center, pixelPos);
+        if (dist > radius) return 0.0;
+        return sqrt(radius*radius - dist*dist);
+    }
+
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / u_resolution.y;
+        uv = rotate(uv, u_rotation);
+
+        vec2 grid_uv = uv * u_density;
+        vec2 cell_id = floor(grid_uv);
+        
+        float total_z = 0.0;
+
+        for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+                vec2 neighbor = vec2(float(x), float(y));
+                vec2 point_on_grid = cell_id + neighbor;
+                vec2 sphereCenter = point_on_grid + 0.5; 
+                total_z += getSphereHeight(sphereCenter, grid_uv, u_radius);
+            }
+        }
+
+        vec3 col;
+        col.r = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.r * 5.0);
+        col.g = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.g * 5.0);
+        col.b = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.b * 5.0);
+
+        if (total_z <= 0.001) col = vec3(0.0);
+
+        col = pow(col, vec3(1.0 / u_gamma));
+
+        gl_FragColor = vec4(col, 1.0);
+    }
+</script>
+
+<script>
+    const canvas = document.getElementById("glCanvas");
+    const container = document.getElementById("canvas-container"); // Get container reference
+    const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true }); // Important for saving!
+
+    if (!gl) alert("WebGL is not supported in your browser!");
+
+    function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, document.getElementById("vertex-shader").text));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, document.getElementById("fragment-shader").text));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+    
+    const posLoc = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const locs = {
+        res: gl.getUniformLocation(program, "u_resolution"),
+        den: gl.getUniformLocation(program, "u_density"),
+        rad: gl.getUniformLocation(program, "u_radius"),
+        rot: gl.getUniformLocation(program, "u_rotation"),
+        col: gl.getUniformLocation(program, "u_color_offset"),
+        gam: gl.getUniformLocation(program, "u_gamma")
+    };
+
+    const ui = {
+        density: document.getElementById("density"),
+        radius: document.getElementById("radius"),
+        rotation: document.getElementById("rotation"),
+        offR: document.getElementById("offsetR"),
+        offG: document.getElementById("offsetG"),
+        offB: document.getElementById("offsetB"),
+        gamma: document.getElementById("gamma")
+    };
+
+    const valDisp = {
+        density: document.getElementById("val_density"),
+        radius: document.getElementById("val_radius"),
+        rotation: document.getElementById("val_rotation"),
+        offR: document.getElementById("val_offR"),
+        offG: document.getElementById("val_offG"),
+        offB: document.getElementById("val_offB"),
+        gamma: document.getElementById("val_gamma")
+    };
+
+    // Helper for stepping buttons
+    window.adjustValue = function(id, direction) {
+        const input = document.getElementById(id);
+        const step = parseFloat(input.step) || 1;
+        const current = parseFloat(input.value);
+        const min = parseFloat(input.min);
+        const max = parseFloat(input.max);
+        
+        let newVal = current + (step * direction);
+        
+        // Clamp value
+        if (newVal < min) newVal = min;
+        if (newVal > max) newVal = max;
+
+        input.value = newVal;
+        // The render loop will pick up the new value automatically
+    };
+
+    function render() {
+        // 1. Update text displays
+        valDisp.density.innerText = ui.density.value;
+        valDisp.radius.innerText  = parseFloat(ui.radius.value).toFixed(2);
+        valDisp.rotation.innerText = parseFloat(ui.rotation.value).toFixed(1);
+        valDisp.offR.innerText = parseFloat(ui.offR.value).toFixed(2);
+        valDisp.offG.innerText = parseFloat(ui.offG.value).toFixed(2);
+        valDisp.offB.innerText = parseFloat(ui.offB.value).toFixed(2);
+        valDisp.gamma.innerText = parseFloat(ui.gamma.value).toFixed(1);
+
+        // 2. Pass values to Shader
+        gl.uniform2f(locs.res, canvas.width, canvas.height);
+        gl.uniform1f(locs.den, parseFloat(ui.density.value));
+        gl.uniform1f(locs.rad, parseFloat(ui.radius.value));
+        gl.uniform1f(locs.rot, parseFloat(ui.rotation.value) * Math.PI / 180.0);
+        gl.uniform3f(locs.col, 
+            parseFloat(ui.offR.value),
+            parseFloat(ui.offG.value),
+            parseFloat(ui.offB.value)
+        );
+        gl.uniform1f(locs.gam, parseFloat(ui.gamma.value));
+
+        // 3. Draw
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(render);
+    }
+
+	/* --- 2. RESIZE HANDLER --- */
+	function resize() {
+        // RESET styles so container can grow/shrink naturally
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+
+        // Find the smallest dimension of the container to make it square
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        const size = Math.min(w, h);
+
+        // Update canvas display size
+        const newWidth = Math.floor(size);
+        const newHeight = Math.floor(size);
+
+		if (canvas.width !== newWidth || canvas.height !== newHeight) {
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            // Also explicitly set style to force reflow if needed
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+	}
+
+    /* --- FULLSCREEN TOGGLE --- */
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+    
+    /* --- IMAGE DOWNLOAD --- */
+    window.downloadImage = function(format) {
+        // 1. Create a temporary 2D canvas
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        
+        // 2. Draw the WebGL content
+        // IMPORTANT: WebGL context must have preserveDrawingBuffer: true (set in getContext)
+        ctx.drawImage(canvas, 0, 0);
+        
+        // 3. Draw Watermark
+        ctx.save();
+        ctx.font = "bold 20px monospace";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        
+        // Add a slight shadow for better visibility
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+
+        // Position: bottom right
+        ctx.fillText("neondreamslab.com", tempCanvas.width - 20, tempCanvas.height - 15);
+        ctx.restore();
+        
+        // 4. Convert to blob and download
+        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+        const link = document.createElement('a');
+        link.download = `pattern_${Date.now()}.${format}`;
+        link.href = tempCanvas.toDataURL(mimeType, 0.9); // 0.9 quality for jpg
+        link.click();
+    };
+
+	window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', function() {
+        // Small delay to allow layout to settle after rotation
+        setTimeout(resize, 200);
+        setTimeout(resize, 500); // safety check
+    });
+
+    // Initial sizing
+	setTimeout(resize, 100);
+	resize(); 
+   
+    render();
+</script>
+
+</body>
+</html>

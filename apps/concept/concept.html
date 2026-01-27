@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Szögfüggvény Vizualizáció - 2D</title>
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f0f2f5;
+        overflow: hidden;
+    }
+
+    .main-layout {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+    }
+    
+    /* BAL OLDAL: GUI */
+    .sidebar {
+        width: 320px;
+        min-width: 300px;
+        background: white;
+        padding: 20px;
+        box-shadow: 2px 0 15px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        overflow-y: auto;
+        z-index: 10;
+        border-right: 1px solid #ddd;
+    }
+
+    h1 {
+        margin: 0 0 5px 0;
+        font-size: 1.4rem;
+        color: #1a1a1a;
+    }
+
+    /* JOBB OLDAL: Rajzterület */
+    .canvas-container {
+        flex-grow: 1;
+        background-color: #eef2f5; 
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        position: relative;
+    }
+
+    /* A Canvas stílusa */
+    canvas#gridCanvas {
+        background-color: #fff; /* Ez lesz a pixelek "alap" színe (fehér) */
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        border-radius: 4px;
+        /* Fontos: ne CSS méretezze torzítva, majd JS kezeli */
+    }
+
+    /* GUI elemek */
+    .controls { display: flex; flex-direction: column; gap: 18px; }
+    
+    .control-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Checkbox stílusosabb */
+    .toggle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        cursor: pointer;
+    }
+    .toggle-row:hover { background: #f1f3f5; }
+    
+    label {
+        font-weight: 600;
+        margin-bottom: 6px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        color: #444;
+    }
+    
+    .input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    input[type="range"] {
+        flex-grow: 1;
+        cursor: pointer;
+        accent-color: #007bff;
+    }
+    
+    button.step-btn {
+        background-color: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        width: 28px;
+        height: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        color: #555;
+    }
+    button.step-btn:hover { background-color: #eee; }
+    
+    .value-display { font-family: monospace; color: #007bff; font-weight: bold; font-size: 1.1em; }
+    
+    .stats {
+        margin-top: auto;
+        padding: 15px;
+        background: #e8f4ff;
+        border-left: 4px solid #007bff;
+        border-radius: 4px;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+    
+    .formula {
+        text-align: center;
+        font-family: "Times New Roman", serif;
+        font-style: italic;
+        font-size: 15px;
+        color: #555;
+        background: #f9f9f9;
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #eee;
+    }
+</style>
+</head>
+<body>
+
+<div class="main-layout">
+    
+    <div class="sidebar">
+        <h1>2D Vizualizáció</h1>
+        <div class="formula">
+            z - ε/2 ≤ cos(x) + cos(y) ≤ z + ε/2
+        </div>
+
+        <div class="controls">
+            <!-- Rács kapcsoló -->
+            <div class="toggle-row" onclick="toggleGrid()">
+                <span style="font-weight:600; font-size:13px; color:#444;">Rácsháló megjelenítése</span>
+                <input type="checkbox" id="showGrid" checked style="cursor:pointer; transform: scale(1.2);">
+            </div>
+
+            <div class="control-group">
+                <label><span>Felbontás (N):</span><span id="val_nSize" class="value-display">20</span></label>
+                <div class="input-wrapper">
+                    <button class="step-btn" onclick="stepValue('nSize', -1)">-</button>
+                    <input type="range" id="nSize" min="2" max="200" step="1" value="20">
+                    <button class="step-btn" onclick="stepValue('nSize', 1)">+</button>
+                </div>
+                <small style="color:#888; margin-top:4px;">Max: 200</small>
+            </div>
+
+            <div class="control-group">
+                <label><span>Z érték (Metszet):</span><span id="val_zValue" class="value-display">2.00</span></label>
+                <div class="input-wrapper">
+                    <button class="step-btn" onclick="stepValue('zValue', -0.01)">-</button>
+                    <input type="range" id="zValue" min="-2.5" max="2.5" step="0.01" value="2">
+                    <button class="step-btn" onclick="stepValue('zValue', 0.01)">+</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label><span>Epsilon (Vastagság):</span><span id="val_epsilon" class="value-display">0.5</span></label>
+                <div class="input-wrapper">
+                    <button class="step-btn" onclick="stepValue('epsilon', -0.01)">-</button>
+                    <input type="range" id="epsilon" min="0.01" max="1.0" step="0.01" value="0.5">
+                    <button class="step-btn" onclick="stepValue('epsilon', 0.01)">+</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label><span>Periódusok:</span><span id="val_periods" class="value-display">1.0</span></label>
+                <div class="input-wrapper">
+                    <button class="step-btn" onclick="stepValue('periods', -0.1)">-</button>
+                    <input type="range" id="periods" min="1.0" max="100.0" step="0.1" value="1.0">
+                    <button class="step-btn" onclick="stepValue('periods', 0.1)">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">Statisztika...</div>
+    </div>
+
+    <div class="canvas-container" id="canvasContainer">
+        <canvas id="gridCanvas"></canvas>
+    </div>
+
+</div>
+
+<script>
+    const canvas = document.getElementById('gridCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+    
+    // UI referenciák
+    const inputN = document.getElementById('nSize');
+    const inputPeriods = document.getElementById('periods');
+    const inputZ = document.getElementById('zValue');
+    const inputEpsilon = document.getElementById('epsilon');
+    const inputGrid = document.getElementById('showGrid');
+    
+    // Érték kijelzők
+    const displayN = document.getElementById('val_nSize');
+    const displayPeriods = document.getElementById('val_periods');
+    const displayZ = document.getElementById('val_zValue');
+    const displayEpsilon = document.getElementById('val_epsilon');
+    
+    const statsDiv = document.getElementById('stats');
+
+    // Segédfüggvény a gombokhoz
+    window.stepValue = function(id, step) {
+        const input = document.getElementById(id);
+        let val = parseFloat(input.value);
+        let min = parseFloat(input.min);
+        let max = parseFloat(input.max);
+        
+        val += step;
+        val = Math.round(val * 10000) / 10000;
+        
+        if (val < min) val = min;
+        if (val > max) val = max;
+        
+        input.value = val;
+        input.dispatchEvent(new Event('input'));
+    };
+
+    window.toggleGrid = function() {
+        // Ez a függvény csak akkor fut le, ha a div-re kattintanak, 
+        // de a checkbox is generál eseményt, ezért védjük ki a duplázást.
+        // A legegyszerűbb, ha a checkbox eseményét figyeljük a fő logikában,
+        // itt pedig csak invertáljuk a checkboxot, ha a DIV-re kattintottak.
+        if (event.target !== inputGrid) {
+            inputGrid.checked = !inputGrid.checked;
+            inputGrid.dispatchEvent(new Event('change'));
+        }
+    };
+
+    function updateVisuals() {
+        // 1. Paraméterek beolvasása
+        let N = parseInt(inputN.value);
+        if (N < 2) N = 2;
+
+        const periods = parseFloat(inputPeriods.value);
+        const z = parseFloat(inputZ.value);
+        const epsilon = parseFloat(inputEpsilon.value);
+        const showGrid = inputGrid.checked;
+
+        // UI Frissítése
+        displayN.textContent = N;
+        displayPeriods.textContent = periods.toFixed(1);
+        displayZ.textContent = z.toFixed(2);
+        displayEpsilon.textContent = epsilon.toFixed(2);
+
+        // 2. Canvas méretezése a konténerhez
+        // Hagyunk kis margót (20px), hogy jól nézzen ki
+        const rect = container.getBoundingClientRect();
+        const maxSize = Math.min(rect.width, rect.height) - 40;
+        
+        // A canvas mérete pixelpontos legyen
+        canvas.width = Math.floor(maxSize);
+        canvas.height = Math.floor(maxSize);
+
+        // 3. Háttér beállítása (ez lesz a RÁCS színe)
+        // Világosszürke rács
+        ctx.fillStyle = showGrid ? "#d0d0d0" : "#ffffff"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 4. Számítások előkészítése
+        const center = (N - 1) / 2;
+        const scale = (periods * 2 * Math.PI) / N;
+        const lowerLimit = z - epsilon / 2;
+        const upperLimit = z + epsilon / 2;
+
+        // Cella méret kiszámítása (lebegőpontos)
+        const cellStep = canvas.width / N;
+        
+        // Ha van rács, akkor a "gap" (rés) mérete legyen 1px, egyébként 0
+        // De ha a cellák nagyon kicsik, ne legyen rés (mert eltűnik a rajz)
+        let gap = 0;
+        if (showGrid && cellStep > 3) {
+            gap = 1;
+        }
+
+        ctx.fillStyle = "#000000"; // Aktív pixelek színe (Fekete)
+        
+        let activePixels = 0;
+
+        // 5. Rajzoló ciklus
+        for (let py = 0; py < N; py++) {
+            const dy = py - center;
+            const angleY = dy * scale;
+            const cosY = Math.cos(angleY);
+
+            // Y pozíció kiszámítása pixel-snappeléssel (fontos az éles rácshoz!)
+            const yPos = Math.floor(py * cellStep);
+            const nextY = Math.floor((py + 1) * cellStep);
+            const h = Math.max(0, nextY - yPos - gap);
+
+            for (let px = 0; px < N; px++) {
+                const dx = px - center;
+                const angleX = dx * scale;
+                const val = Math.cos(angleX) + cosY;
+
+                if (val >= lowerLimit && val <= upperLimit) {
+                    activePixels++;
+                    
+                    // X pozíció
+                    const xPos = Math.floor(px * cellStep);
+                    const nextX = Math.floor((px + 1) * cellStep);
+                    const w = Math.max(0, nextX - xPos - gap);
+
+                    // Rajzolás
+                    ctx.fillRect(xPos, yPos, w, h);
+                } else {
+                    // Ha nem aktív pixel, és NEM akarunk rácsot, 
+                    // akkor ide rajzolhatnánk fehéret, de az alap canvas szín már fehér,
+                    // ha a rács ki van kapcsolva. 
+                    // Ha a rács BE van kapcsolva, a háttér szürke, tehát az inaktív cellák szürkék maradnak (rács)
+                    // Hacsak nem akarjuk, hogy az inaktív cellák fehérek legyenek a szürke rácson belül:
+                    
+                    if (showGrid) {
+                         const xPos = Math.floor(px * cellStep);
+                         const nextX = Math.floor((px + 1) * cellStep);
+                         const w = Math.max(0, nextX - xPos - gap);
+                         
+                         // Inaktív cella kitöltése fehérrel (így a háttérszürke csak a résekben látszik)
+                         ctx.fillStyle = "#ffffff";
+                         ctx.fillRect(xPos, yPos, w, h);
+                         ctx.fillStyle = "#000000"; // Visszaállítás feketére a kövi pixelhez
+                    }
+                }
+            }
+        }
+
+        // 6. Statisztika
+        const totalPixels = N * N;
+        const percentage = ((activePixels / totalPixels) * 100).toFixed(2);
+        
+        statsDiv.innerHTML = `
+            N méret: <b>${N}x${N}</b><br>
+            Aktív cellák: <b>${activePixels}</b> / ${totalPixels}<br>
+            Lefedettség: <b>${percentage}%</b>
+        `;
+    }
+
+    // Eseménykezelők
+    inputPeriods.addEventListener('input', () => requestAnimationFrame(updateVisuals));
+    inputN.addEventListener('input', () => requestAnimationFrame(updateVisuals));
+    inputZ.addEventListener('input', () => requestAnimationFrame(updateVisuals));
+    inputEpsilon.addEventListener('input', () => requestAnimationFrame(updateVisuals));
+    inputGrid.addEventListener('change', () => requestAnimationFrame(updateVisuals));
+
+    // Ablak átméretezés figyelése
+    const resizeObserver = new ResizeObserver(() => {
+        requestAnimationFrame(updateVisuals);
+    });
+    resizeObserver.observe(container);
+
+    // Indítás
+    updateVisuals();
+
+</script>
+</body>
+</html>

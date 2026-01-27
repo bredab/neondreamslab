@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Simple Pattern Generator v1.0.0</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --border-color: #334155;
+            --input-bg: #0f172a;
+        }
+
+        body { 
+            margin: 0; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: var(--text-main); 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: auto; /* Allow scroll if screen is too small */
+        }
+
+        #app-wrapper {
+            display: flex;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            gap: 20px;
+            max-width: 1200px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* --- LEFT PANEL --- */
+        #controls {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 10px;
+            border-right: 1px solid var(--border-color);
+        }
+
+        h1 {
+            margin: 0 0 15px 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .value-display {
+            color: var(--accent-color);
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* --- STEPPER & SLIDER STYLING --- */
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.step-btn {
+            background: var(--border-color);
+            color: var(--text-main);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            line-height: 1;
+            transition: background 0.2s;
+        }
+
+        button.step-btn:hover {
+            background: var(--accent-color);
+        }
+
+        button.step-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: transparent; 
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            margin-top: -6px; 
+            box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        /* Firefox specific */
+        input[type=range]::-moz-range-thumb {
+            height: 16px;
+            width: 16px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+
+        /* --- CANVAS --- */
+        canvas { 
+            width: 800px; 
+            height: 800px; 
+            background: #000; 
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 1px solid #000;
+            display: block;
+        }
+
+        /* Specific Colors for Offsets */
+        .color-label-r { color: #f87171 !important; }
+        .color-label-g { color: #4ade80 !important; }
+        .color-label-b { color: #60a5fa !important; }
+
+    </style>
+</head>
+<body>
+
+<div id="app-wrapper">
+    <!-- LEFT SIDE: CONTROLS -->
+    <div id="controls">
+        <h1>Simple Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.0</span></h1>
+        
+        <div class="control-group">
+            <div class="label-row">
+                <span>Grid Density</span>
+                <span id="val_density" class="value-display">10</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('density', -1)">-</button>
+                <input type="range" id="density" min="1" max="50" value="10" step="0.1">
+                <button class="step-btn" onclick="adjustValue('density', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Radius</span>
+                <span id="val_radius" class="value-display">0.60</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('radius', -1)">-</button>
+                <input type="range" id="radius" min="0.1" max="2.0" value="0.6" step="0.01">
+                <button class="step-btn" onclick="adjustValue('radius', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Rotation (deg)</span>
+                <span id="val_rotation" class="value-display">0</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('rotation', -1)">-</button>
+                <input type="range" id="rotation" min="0" max="90" value="0" step="0.1">
+                <button class="step-btn" onclick="adjustValue('rotation', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span class="color-label-r">Red Offset</span>
+                <span id="val_offR" class="value-display">0.00</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('offsetR', -1)">-</button>
+                <input type="range" id="offsetR" min="0" max="2.0" value="0.0" step="0.01">
+                <button class="step-btn" onclick="adjustValue('offsetR', 1)">+</button>
+            </div>
+
+            <div class="label-row" style="margin-top: 10px;">
+                <span class="color-label-g">Green Offset</span>
+                <span id="val_offG" class="value-display">0.30</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('offsetG', -1)">-</button>
+                <input type="range" id="offsetG" min="0" max="2.0" value="0.3" step="0.01">
+                <button class="step-btn" onclick="adjustValue('offsetG', 1)">+</button>
+            </div>
+
+            <div class="label-row" style="margin-top: 10px;">
+                <span class="color-label-b">Blue Offset</span>
+                <span id="val_offB" class="value-display">0.60</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('offsetB', -1)">-</button>
+                <input type="range" id="offsetB" min="0" max="2.0" value="0.6" step="0.01">
+                <button class="step-btn" onclick="adjustValue('offsetB', 1)">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Contrast (Gamma)</span>
+                <span id="val_gamma" class="value-display">1.0</span>
+            </div>
+            <div class="input-row">
+                <button class="step-btn" onclick="adjustValue('gamma', -1)">-</button>
+                <input type="range" id="gamma" min="0.1" max="3.0" value="1.0" step="0.1">
+                <button class="step-btn" onclick="adjustValue('gamma', 1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT SIDE: CANVAS -->
+    <canvas id="glCanvas" width="800" height="800"></canvas>
+</div>
+
+<!-- SHADERS (UNCHANGED FUNCTIONALITY) -->
+<script id="vertex-shader" type="x-shader/x-vertex">
+    attribute vec2 position;
+    void main() {
+        gl_Position = vec4(position, 0.0, 1.0);
+    }
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+    precision highp float;
+
+    uniform vec2 u_resolution;
+    uniform float u_density;
+    uniform float u_radius;
+    uniform float u_rotation; 
+    uniform vec3 u_color_offset; 
+    uniform float u_gamma;
+
+    vec2 rotate(vec2 uv, float angle) {
+        float s = sin(angle);
+        float c = cos(angle);
+        return vec2(uv.x * c - uv.y * s, uv.x * s + uv.y * c);
+    }
+
+    float getSphereHeight(vec2 center, vec2 pixelPos, float radius) {
+        float dist = distance(center, pixelPos);
+        if (dist > radius) return 0.0;
+        return sqrt(radius*radius - dist*dist);
+    }
+
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / u_resolution.y;
+        uv = rotate(uv, u_rotation);
+
+        vec2 grid_uv = uv * u_density;
+        vec2 cell_id = floor(grid_uv);
+        
+        float total_z = 0.0;
+
+        for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+                vec2 neighbor = vec2(float(x), float(y));
+                vec2 point_on_grid = cell_id + neighbor;
+                vec2 sphereCenter = point_on_grid + 0.5; 
+                total_z += getSphereHeight(sphereCenter, grid_uv, u_radius);
+            }
+        }
+
+        vec3 col;
+        col.r = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.r * 5.0);
+        col.g = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.g * 5.0);
+        col.b = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.b * 5.0);
+
+        if (total_z <= 0.001) col = vec3(0.0);
+
+        col = pow(col, vec3(1.0 / u_gamma));
+
+        gl_FragColor = vec4(col, 1.0);
+    }
+</script>
+
+<script>
+    const canvas = document.getElementById("glCanvas");
+    const gl = canvas.getContext("webgl");
+
+    if (!gl) alert("WebGL is not supported in your browser!");
+
+    function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, document.getElementById("vertex-shader").text));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, document.getElementById("fragment-shader").text));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+    
+    const posLoc = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const locs = {
+        res: gl.getUniformLocation(program, "u_resolution"),
+        den: gl.getUniformLocation(program, "u_density"),
+        rad: gl.getUniformLocation(program, "u_radius"),
+        rot: gl.getUniformLocation(program, "u_rotation"),
+        col: gl.getUniformLocation(program, "u_color_offset"),
+        gam: gl.getUniformLocation(program, "u_gamma")
+    };
+
+    const ui = {
+        density: document.getElementById("density"),
+        radius: document.getElementById("radius"),
+        rotation: document.getElementById("rotation"),
+        offR: document.getElementById("offsetR"),
+        offG: document.getElementById("offsetG"),
+        offB: document.getElementById("offsetB"),
+        gamma: document.getElementById("gamma")
+    };
+
+    const valDisp = {
+        density: document.getElementById("val_density"),
+        radius: document.getElementById("val_radius"),
+        rotation: document.getElementById("val_rotation"),
+        offR: document.getElementById("val_offR"),
+        offG: document.getElementById("val_offG"),
+        offB: document.getElementById("val_offB"),
+        gamma: document.getElementById("val_gamma")
+    };
+
+    // Helper for stepping buttons
+    window.adjustValue = function(id, direction) {
+        const input = document.getElementById(id);
+        const step = parseFloat(input.step) || 1;
+        const current = parseFloat(input.value);
+        const min = parseFloat(input.min);
+        const max = parseFloat(input.max);
+        
+        let newVal = current + (step * direction);
+        
+        // Clamp value
+        if (newVal < min) newVal = min;
+        if (newVal > max) newVal = max;
+
+        input.value = newVal;
+        // The render loop will pick up the new value automatically
+    };
+
+    function render() {
+        // 1. Update text displays
+        valDisp.density.innerText = ui.density.value;
+        valDisp.radius.innerText  = parseFloat(ui.radius.value).toFixed(2);
+        valDisp.rotation.innerText = parseFloat(ui.rotation.value).toFixed(1);
+        valDisp.offR.innerText = parseFloat(ui.offR.value).toFixed(2);
+        valDisp.offG.innerText = parseFloat(ui.offG.value).toFixed(2);
+        valDisp.offB.innerText = parseFloat(ui.offB.value).toFixed(2);
+        valDisp.gamma.innerText = parseFloat(ui.gamma.value).toFixed(1);
+
+        // 2. Pass values to Shader
+        gl.uniform2f(locs.res, canvas.width, canvas.height);
+        gl.uniform1f(locs.den, parseFloat(ui.density.value));
+        gl.uniform1f(locs.rad, parseFloat(ui.radius.value));
+        gl.uniform1f(locs.rot, parseFloat(ui.rotation.value) * Math.PI / 180.0);
+        gl.uniform3f(locs.col, 
+            parseFloat(ui.offR.value),
+            parseFloat(ui.offG.value),
+            parseFloat(ui.offB.value)
+        );
+        gl.uniform1f(locs.gam, parseFloat(ui.gamma.value));
+
+        // 3. Draw
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(render);
+    }
+    
+    render();
+</script>
+
+</body>
+</html>

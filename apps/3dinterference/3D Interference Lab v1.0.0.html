@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Interference Lab v1.0.0</title>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <style>
+        body { 
+            margin: 0; 
+			overflow: hidden; 
+			font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(-45deg, #000000, #090a0f, #1a1f3c, #0f2027);
+            background-size: 400% 400%;
+            animation: gradientAnim 30s ease infinite;
+            height: 100vh; 
+			width: 100vw; }
+		
+        @keyframes gradientAnim {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; } }
+        
+        #gui {
+            position: absolute; 
+			top: 0; 
+			left: 0; 
+			width: 340px; 
+			height: 100vh;
+            background: rgba(10, 12, 16, 0.9);
+            padding: 20px; 
+			box-sizing: border-box;
+            color: #eee; 
+			box-shadow: 2px 0 20px rgba(0,0,0,0.5); 
+			backdrop-filter: blur(10px);
+            overflow-y: auto; 
+			scrollbar-width: thin; 
+			scrollbar-color: #444 #222;
+            z-index: 10; 
+			border-right: 1px solid #333; }
+
+        h2 { 
+			margin: 0 0 20px 0; 
+			font-size: 16px; 
+			font-weight: 600; 
+			border-bottom: 1px solid #444; 
+			padding-bottom: 10px; 
+			text-transform: uppercase; 
+			letter-spacing: 1px; 
+			color: #4dabf7; }
+        
+		.control { 
+			margin-bottom: 15px; }
+        
+		label { 
+			display: flex; 
+			justify-content: space-between; 
+			font-size: 12px; 
+			margin-bottom: 5px; 
+			color: #bbb; }
+        
+		.val { 
+			color: #fff; 
+			font-weight: bold; 
+			font-family: monospace; }
+        
+        .slider-group { 
+			display: flex; 
+			align-items: center; 
+			gap: 5px; }
+        
+		input[type=range] { 
+			flex-grow: 1; 
+			cursor: pointer; 
+			accent-color: #4dabf7; 
+			height: 4px; 
+			border-radius: 2px; }
+        
+        button.step-btn {
+            background: #333; 
+			border: 1px solid #444; 
+			color: white; 
+			width: 24px; 
+			height: 24px; 
+			border-radius: 4px;
+            cursor: pointer; 
+			font-weight: bold; 
+			display: flex; 
+			align-items: center; 
+			justify-content: center; 
+			transition: all 0.2s; }
+        
+		button.step-btn:hover { 
+			background: #555; 
+			border-color: #666; }
+
+        input[type=color] { 
+			width: 100%; 
+			height: 28px; 
+			border: none; 
+			cursor: pointer; 
+			border-radius: 4px; 
+			background: none; 
+			padding: 0;}
+			
+        select { 
+			width: 100%; 
+			padding: 6px; 
+			background: #2a2a30; 
+			color: white; 
+			border: 1px solid #444; 
+			border-radius: 4px; 
+			cursor: pointer; 
+			outline: none; }
+			
+        select:focus { 
+			border-color: #4dabf7; }
+
+        .section-title { 
+			margin-top: 25px; 
+			margin-bottom: 10px; 
+			font-size: 11px; 
+			text-transform: uppercase; 
+			color: #777; 
+			letter-spacing: 1px; 
+			border-bottom: 1px solid #333; 
+			padding-bottom: 2px; }
+        
+		.checkbox-wrapper { 
+			display: flex; 
+			align-items: center; 
+			margin-bottom: 8px; 
+			font-size: 13px; 
+			color: #ccc; 
+			cursor: pointer; 
+			user-select: none; }
+			
+        .checkbox-wrapper input { 
+			margin-right: 10px; 
+			cursor: pointer; 
+			accent-color: #4dabf7; }
+        
+		.color-group { 
+			display: flex; 
+			gap: 5px; } 
+			
+		.color-group input { 
+			flex: 1; }
+
+        .disabled { 
+			opacity: 0.3; 
+			pointer-events: none; }
+
+        /* EQUATION EDITOR STYLES */
+        #formula-input {
+            width: 100%;
+            background: #1a1a20;
+            border: 1px solid #444;
+            color: #4dabf7;
+            padding: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            border-radius: 4px;
+            box-sizing: border-box;
+            outline: none; }
+		
+        #formula-input:focus { 
+			border-color: #4dabf7; }
+        
+        #formula-status {
+            font-size: 11px;
+            margin-top: 5px;
+            min-height: 15px; }
+        
+		.status-ok { 
+			color: #00ff88; }
+        
+		.status-err { 
+			color: #ff4444; }
+
+        #gpu-info { 
+			margin-top: 15px; 
+			padding: 10px; 
+			background: #15151a; 
+			border-radius: 4px; 
+			border-left: 3px solid #4dabf7; 
+			font-family: monospace; 
+			font-size: 11px; 
+			color: #aaa; 
+			line-height: 1.4; }
+        
+		#gpu-info b { 
+			color: #fff; }
+        
+		#stats-container { 
+			position: absolute; 
+			top: 5px; 
+			right: 5px; 
+			z-index: 100; 
+			border: 2px solid #4dabf7; 
+			border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+    <div id="stats-container"></div>
+
+    <div id="gui">
+        <h2>3D Interference Lab v1.0.0</h2>
+        
+        <!-- MATEMATIKA / KÉPLET -->
+        <div class="section-title">Formula Editor</div>
+        
+        <div class="control">
+            <label>Presets:</label>
+            <select id="sel_preset">
+                <option value="schwarzp">Schwarz P (Classic)</option>
+                <option value="schwarzd">Schwarz D (Diamond)</option>
+                <option value="gyroid">Gyroid</option>
+                <option value="neovius">Neovius</option>
+                <option value="tubes">Pipes</option>
+                <option value="atom">Atomic lattice</option>
+                <option value="pyramids">Pyramids</option>
+                <option value="terraces">Gradual</option>
+                <option value="custom">Custom...</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label>Equation f(x,y,z) = 0:</label>
+            <input type="text" id="formula-input" value="cos(x) + cos(y) + cos(z)" spellcheck="false">
+            <div id="formula-status" class="status-ok">Formula active</div>
+        </div>
+
+        <div class="section-title">Parameters</div>
+        <div class="control">
+            <label>Grid size: <span id="lbl_n" class="val">30</span></label>
+            <div class="slider-group">
+                <button class="step-btn" onclick="adjust('inp_n', -1)">-</button>
+                <input type="range" id="inp_n" min="10" max="200" step="1" value="30">
+                <button class="step-btn" onclick="adjust('inp_n', 1)">+</button>
+            </div>
+        </div>
+        <div class="control">
+            <label>Offset: <span id="lbl_w" class="val">0.00</span></label>
+            <div class="slider-group">
+                <button class="step-btn" onclick="adjust('inp_w', -0.05)">-</button>
+                <input type="range" id="inp_w" min="-3" max="3" step="0.05" value="0">
+                <button class="step-btn" onclick="adjust('inp_w', 0.05)">+</button>
+            </div>
+        </div>
+        <div class="control">
+            <label>Tolerance: <span id="lbl_eps" class="val">0.5</span></label>
+            <div class="slider-group">
+                <button class="step-btn" onclick="adjust('inp_eps', -0.01)">-</button>
+                <input type="range" id="inp_eps" min="0.01" max="1.5" step="0.01" value="0.5">
+                <button class="step-btn" onclick="adjust('inp_eps', 0.01)">+</button>
+            </div>
+        </div>
+        <div class="control">
+            <label>Periods: <span id="lbl_per" class="val">1.0</span></label>
+            <div class="slider-group">
+                <button class="step-btn" onclick="adjust('inp_per', -0.1)">-</button>
+                <input type="range" id="inp_per" min="1" max="100" step="0.1" value="1.0">
+                <button class="step-btn" onclick="adjust('inp_per', 0.1)">+</button>
+            </div>
+        </div>
+
+        <div class="section-title">Material & Shape</div>
+        <div class="control">
+            <label>Shape:</label>
+            <select id="sel_geometry">
+                <option value="sphere">Sphere</option>
+                <option value="cube">Cube</option>
+                <option value="cuber">Cobe (Rounded)</option>
+                <option value="octahedron">Octahedron</option>
+                <option value="icosahedron">Icosahedron</option>
+                <option value="dodecahedron">Dodecahedron</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label>Size distribution:</label>
+            <select id="sel_size_dist">
+                <option value="uniform">Uniform</option>
+                <option value="center">Larger in the middle</option>
+                <option value="edge">Larger on the edge</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label>Base size: <span id="lbl_size" class="val">1.0</span></label>
+            <div class="slider-group">
+                <button class="step-btn" onclick="adjust('inp_size', -0.1)">-</button>
+                <input type="range" id="inp_size" min="0.1" max="5.0" step="0.1" value="1.0">
+                <button class="step-btn" onclick="adjust('inp_size', 0.1)">+</button>
+            </div>
+        </div>
+
+        <div class="control">
+            <label>Metalness:</label>
+            <input type="range" id="inp_metal" min="0" max="1" step="0.01" value="0.3">
+        </div>
+        <div class="control">
+            <label>Roughness:</label>
+            <input type="range" id="inp_rough" min="0" max="1" step="0.01" value="0.0">
+        </div>
+        <div class="control">
+            <label>Clearcoat:</label>
+            <input type="range" id="inp_clearcoat" min="0" max="1" step="0.01" value="0.0">
+        </div>
+        <div class="control">
+            <label>Mirroring Strength:</label>
+            <input type="range" id="inp_env_intensity" min="0" max="3" step="0.01" value="0.3">
+        </div>
+        <div class="control">
+            <label>Glossiness:</label>
+            <input type="range" id="inp_transmission" min="0" max="1" step="0.01" value="0.0">
+        </div>
+
+        <div class="section-title">Colorisation</div>
+        <label class="checkbox-wrapper"><input type="checkbox" id="chk_gradient" checked> Smart Colorisation</label>
+        
+        <div class="control">
+            <label>Colors (Min -> Middle -> Max):</label>
+            <div class="color-group">
+                <input type="color" id="inp_color_min" value="#0000ff" title="Low value">
+                <input type="color" id="inp_color_mid" value="#ff0000" title="Middle value">
+                <input type="color" id="inp_color_max" value="#00ff00" title="High value">
+            </div>
+        </div>
+
+        <div class="section-title">Camera</div>
+        
+        <label class="checkbox-wrapper"><input type="checkbox" id="chk_perspective" checked> Perspective</label>
+        
+        <div class="control" id="fov_container">
+            <label>Angle of View: <span id="lbl_fov" class="val">45</span>°</label>
+            <div class="slider-group">
+                <button class="step-btn" onclick="adjust('inp_fov', -5)">-</button>
+                <input type="range" id="inp_fov" min="10" max="120" step="1" value="45">
+                <button class="step-btn" onclick="adjust('inp_fov', 5)">+</button>
+            </div>
+        </div>
+
+        <div class="section-title">Environment & Settings</div>
+        <div class="control">
+            <label>Environment (HDRI):</label>
+            <select id="sel_hdri">
+                <option value="studio">Studio</option>
+                <option value="sunrise">Sunset</option>
+                <option value="night">Night</option>
+            </select>
+        </div>
+        <label class="checkbox-wrapper"><input type="checkbox" id="chk_stars" checked> Starfield</label>
+		<label class="checkbox-wrapper"><input type="checkbox" id="chk_bg_anim" checked> Background animation</label>
+        <label class="checkbox-wrapper"><input type="checkbox" id="chk_rotate"> Automatic rotation</label>
+
+        <div id="stats-display">Loading...</div>
+        
+        <div id="gpu-info">
+            <div>Triangles: <span id="gpu-tris">0</span></div>
+            <div>Draw Calls: <span id="gpu-calls">0</span></div>
+            <div>Geometries: <span id="gpu-geo">0</span></div>
+        </div>
+    </div>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+    import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+    import Stats from 'three/addons/libs/stats.module.js';
+
+    window.adjust = function(id, delta) {
+        const input = document.getElementById(id);
+        let val = parseFloat(input.value) + delta;
+        const min = parseFloat(input.min), max = parseFloat(input.max);
+        if (val < min) val = min; 
+		if (val > max) val = max;
+        input.value = val;
+        input.dispatchEvent(new Event('input'));
+    };
+
+    const params = {
+        n: 30, 
+		w: 0.0, 
+		epsilon: 0.5, 
+		periods: 1.0, 
+		size: 1.0,
+        geom: 'sphere',
+		sizeDist: 'uniform',
+        metalness: 0.3, 
+		roughness: 0.0, 
+		transmission: 0.0, 
+		clearcoat: 0.0, 
+		envIntensity: 0.3,
+        gradient: true,
+        colorMin: new THREE.Color('#0000ff'),
+        colorMid: new THREE.Color('#ff0000'),
+        colorMax: new THREE.Color('#00ff00'),
+        fov: 45
+    };
+
+    // --- MATH PARSER ---
+    // Engedélyezett tokenek biztonsági okokból
+    const ALLOWED_MATH = /^[0-9x-z\.\+\-\*\/\(\)\%\,\s\b(sin|cos|tan|abs|sqrt|max|min|floor|ceil|pow)]*$/;
+    let customFunction = null;
+
+    const PRESETS = {
+        schwarzp: "cos(x) + cos(y) + cos(z)",
+        gyroid: "sin(x)*cos(y) + sin(y)*cos(z) + sin(z)*cos(x)",
+        schwarzd: "sin(x)*sin(y)*sin(z) + sin(x)*cos(y)*cos(z) + cos(x)*sin(y)*cos(z) + cos(x)*cos(y)*sin(z)",
+        neovius: "3*(cos(x)+cos(y)+cos(z)) + 4*cos(x)*cos(y)*cos(z)",
+        tubes: "cos(x) + cos(y)", 
+        atom: "cos(x) * cos(y) * cos(z)",
+        pyramids: "abs(sin(x)) + abs(sin(y)) + abs(sin(z))",
+        terraces: "sin(x) + sin(y) + 0.5*floor(z)" 
+    };
+
+    function compileFormula(str) {
+        const statusEl = document.getElementById('formula-status');
+        
+        // Előkészítés: Minden ismert matek kifejezést lecserélünk Math.kifejezés-re
+        let jsStr = str.toLowerCase();
+        
+        // Térkép a cserékhez (hosszabbakat előre, hogy ne cserélje pl. a 'ceil'-ben az 'e'-t ha lenne olyan változó)
+        const replacements = {
+            'sin': 'Math.sin',
+            'cos': 'Math.cos',
+            'tan': 'Math.tan',
+            'abs': 'Math.abs',
+            'sqrt': 'Math.sqrt',
+            'max': 'Math.max',
+            'min': 'Math.min',
+            'floor': 'Math.floor',
+            'ceil': 'Math.ceil',
+            'pow': 'Math.pow'
+        };
+
+        // Cseréljük le a kulcsszavakat
+        for (const key in replacements) {
+            // Regex: csak akkor cseréljük, ha szóhatár van (tehát a "cos" szót cseréljük, de a "cost" változót nem bántanánk)
+            const regex = new RegExp(`\\b${key}\\b`, 'g');
+            jsStr = jsStr.replace(regex, replacements[key]);
+        }
+
+        try {
+            // Ellenőrzés a regex-szel (az eredeti stringen)
+            if (!ALLOWED_MATH.test(str)) {
+                throw new Error("Forbidden characters!");
+            }
+
+            const func = new Function('x', 'y', 'z', 'return ' + jsStr + ';');
+            
+            // Teszt
+            const test = func(1,1,1);
+            if(isNaN(test) && test !== NaN) { 
+                // Megjegyzés: A NaN nem feltétlenül hiba (pl sqrt(-1)), de jelzi, hogy lefutott
+            }
+
+            customFunction = func;
+            statusEl.textContent = "Formula is active.";
+            statusEl.className = "status-ok";
+            return true;
+        } catch(e) {
+            statusEl.textContent = "Error: " + e.message;
+            statusEl.className = "status-err";
+            return false;
+        }
+    }
+
+    // --- INIT ---
+    const scene = new THREE.Scene();
+    scene.background = null; 
+    scene.fog = new THREE.Fog(0x000000, 100, 500);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = false; 
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.body.appendChild(renderer.domElement);
+
+    const stats = new Stats();
+    stats.dom.style.position = 'absolute';
+    stats.dom.style.left = 'auto'; 
+    stats.dom.style.right = '0px'; 
+    stats.dom.style.top = '0px';
+    document.body.appendChild(stats.dom);
+
+    const hdriUrls = {
+        studio: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/aerodynamics_workshop_1k.hdr',
+        sunrise: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/spruit_sunrise_1k.hdr',
+        night: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/moonless_golf_1k.hdr'
+    };
+
+    const rgbeLoader = new RGBELoader();
+    function loadHDRI(key) {
+        rgbeLoader.load(hdriUrls[key], function(texture) {
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            if(scene.environment) scene.environment.dispose();
+            scene.environment = texture;
+        });
+    }
+    loadHDRI('studio');
+
+    let stars;
+    function createStars() {
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 3000;
+        const posArray = new Float32Array(starCount * 3);
+        for(let i = 0; i < starCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 300; 
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const starMat = new THREE.PointsMaterial({
+            size: 0.3, color: 0xffffff, transparent: true, opacity: 0.8, sizeAttenuation: true
+        });
+        stars = new THREE.Points(starGeo, starMat);
+        scene.add(stars);
+    }
+    createStars();
+
+    const SIDEBAR_WIDTH = 340;
+	
+    function updateCameraOffset(cam) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        cam.setViewOffset(w, h, -SIDEBAR_WIDTH/2, 0, w, h);
+    }
+
+    const aspect = window.innerWidth / window.innerHeight;
+    const perspectiveCamera = new THREE.PerspectiveCamera(params.fov, aspect, 0.1, 1000);
+    perspectiveCamera.position.set(40, 30, 50);
+
+    const orthoSize = 50;
+    const orthoCamera = new THREE.OrthographicCamera(
+        orthoSize * aspect / -2, orthoSize * aspect / 2, orthoSize / 2, orthoSize / -2, 1, 1000
+    );
+    orthoCamera.position.set(40, 30, 50);
+    orthoCamera.zoom = 1;
+    
+    let currentCamera = perspectiveCamera;
+    updateCameraOffset(currentCamera);
+
+    const controls = new OrbitControls(currentCamera, renderer.domElement);
+    controls.enableDamping = true; 
+	controls.dampingFactor = 0.05; 
+	controls.zoomSpeed = 0.6; 
+	controls.target.set(0, 0, 0);
+
+    const ambientLight = new THREE.AmbientLight(0x111111, 1); 
+	scene.add(ambientLight);
+    
+	const dirLight = new THREE.DirectionalLight(0xffffff, 3);
+    dirLight.position.set(20, 50, 20); 
+    dirLight.castShadow = false;
+    scene.add(dirLight);
+
+    const material = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff, 
+        metalness: params.metalness, 
+        roughness: params.roughness,
+        transmission: params.transmission, 
+        thickness: 0.2, 
+        ior: 1.1, 
+        envMapIntensity: params.envIntensity,
+        clearcoat: params.clearcoat,
+        clearcoatRoughness: 0.1,
+        side: THREE.DoubleSide
+    });
+
+    let mesh;
+    const dummy = new THREE.Object3D();
+    const tempColor = new THREE.Color();
+
+    function rebuildMesh() {
+        if (mesh) { 
+			scene.remove(mesh); 
+			mesh.dispose(); 
+		}
+        let geometry;
+        switch(params.geom) {
+            case 'cube': geometry = new THREE.BoxGeometry(1, 1, 1); break;
+			case 'cuber': geometry = new RoundedBoxGeometry(1, 1, 1, 4, 0.1); break;
+            case 'octahedron': geometry = new THREE.OctahedronGeometry(0.7, 0); break;
+            case 'icosahedron': geometry = new THREE.IcosahedronGeometry(0.6, 0); break;
+            case 'dodecahedron': geometry = new THREE.DodecahedronGeometry(0.6, 0); break;
+            default: geometry = new THREE.SphereGeometry(0.6, 32, 32); break;
+        }
+        const MAX_INSTANCES = 90 * 90 * 90; // Biztonsági limit
+        mesh = new THREE.InstancedMesh(geometry, material, MAX_INSTANCES);
+        mesh.castShadow = false; 
+        mesh.receiveShadow = false; 
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        scene.add(mesh);
+        updateInstances();
+    }
+
+    function updateInstances() {
+        if (!mesh || !customFunction) return;
+
+        const { n, w, epsilon, periods, size, sizeDist, gradient, colorMin, colorMid, colorMax } = params;
+        
+        let count = 0;
+        const center = (n - 1) / 2;
+        const spaceScale = 40 / n; 
+        const freqScale = (periods * 2 * Math.PI) / n;
+        const lower = w - epsilon / 2;
+        const upper = w + epsilon / 2;
+        const range = upper - lower;
+		const maxDist = Math.sqrt(20*20 + 20*20 + 20*20);
+		
+        material.color.set(0xffffff);
+
+        // Optimalizáció: A függvényt hívjuk meg minden pontban.
+        // Mivel ez dinamikus, nem tudjuk előre kiszámolni a cos(x)-et a cikluson kívül,
+        // mert a függvény lehet pl sin(x*y) is.
+        // Ezért a nyers koordinátákat (angleX, angleY, angleZ) adjuk át.
+        
+        for (let x = 0; x < n; x++) {
+            const worldX = (x - center) * spaceScale;
+            const angleX = (x - center) * freqScale;
+
+            for (let y = 0; y < n; y++) {
+                const worldY = (y - center) * spaceScale;
+                const angleY = (y - center) * freqScale;
+
+                for (let z = 0; z < n; z++) {
+                    const angleZ = (z - center) * freqScale;
+                    
+                    // ITT A VARÁZSLAT: Meghívjuk a user függvényét
+                    const val = customFunction(angleX, angleY, angleZ);
+
+                    if (val >= lower && val <= upper) {
+                        const worldZ = (z - center) * spaceScale;
+ 
+                        // Távolság a középponttól (0,0,0)
+                        const dist = Math.sqrt(worldX*worldX + worldY*worldY + worldZ*worldZ);
+                        
+                        // --- DINAMIKUS MÉRET LOGIKA ---
+                        let scaleFactor = 1.0;
+                        if (sizeDist === 'center') {
+                            // Középen 100%, szélen 20%
+                            scaleFactor = Math.max(0.2, 1 - (dist / maxDist));
+                        } else if (sizeDist === 'edge') {
+                            // Középen 20%, szélen 100%
+                            scaleFactor = Math.max(0.2, (dist / maxDist));
+                        }
+ 
+                        dummy.position.set(worldX, worldY, worldZ);
+                        dummy.scale.setScalar(size * scaleFactor); 
+                        dummy.updateMatrix();
+                        mesh.setMatrixAt(count, dummy.matrix);
+
+                        if (gradient) {
+                            let ratio = 0;
+                            if (range > 0.0001) ratio = (val - lower) / range;
+                            ratio = Math.max(0, Math.min(1, ratio));
+
+                            if (ratio < 0.5) {
+                                const subRatio = ratio * 2;
+                                tempColor.lerpColors(colorMin, colorMid, subRatio);
+                            } else {
+                                const subRatio = (ratio - 0.5) * 2;
+                                tempColor.lerpColors(colorMid, colorMax, subRatio);
+                            }
+                            mesh.setColorAt(count, tempColor);
+                        } else {
+                            mesh.setColorAt(count, colorMin);
+                        }
+                        count++;
+                    }
+                }
+            }
+        }
+
+        mesh.count = count;
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        document.getElementById('stats-display').innerHTML = `Number of shapes: <b>${count.toLocaleString()}</b>`;
+    }
+
+    // --- UI LOGIKA ---
+    
+    // Preset váltás
+    const inputEl = document.getElementById('formula-input');
+    const selPreset = document.getElementById('sel_preset');
+    
+    // Kezdeti fordítás
+    compileFormula(inputEl.value);
+
+    selPreset.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if(val !== 'custom') {
+            inputEl.value = PRESETS[val];
+            compileFormula(PRESETS[val]);
+            updateInstances();
+        }
+    });
+
+    // Képlet írásakor Enter vagy Blur eseményre frissítünk
+    inputEl.addEventListener('change', () => {
+        if(compileFormula(inputEl.value)) {
+            selPreset.value = 'custom'; // Átállítjuk a selectet Customra
+            updateInstances();
+        }
+    });
+    
+    // Enter gomb támogatás
+    inputEl.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') {
+            inputEl.blur(); // Ez kiváltja a change eventet
+        }
+    });
+
+    // Többi paraméter
+    function onDataChange() {
+        params.n = parseInt(document.getElementById('inp_n').value);
+        params.w = parseFloat(document.getElementById('inp_w').value);
+        params.epsilon = parseFloat(document.getElementById('inp_eps').value);
+        params.periods = parseFloat(document.getElementById('inp_per').value);
+        params.size = parseFloat(document.getElementById('inp_size').value);
+        
+        document.getElementById('lbl_n').textContent = params.n;
+        document.getElementById('lbl_w').textContent = params.w.toFixed(2);
+        document.getElementById('lbl_eps').textContent = params.epsilon.toFixed(2);
+        document.getElementById('lbl_per').textContent = params.periods.toFixed(1);
+        document.getElementById('lbl_size').textContent = params.size.toFixed(2);
+        
+        updateInstances();
+    }
+    ['inp_n', 'inp_w', 'inp_eps', 'inp_per', 'inp_size'].forEach(id => 
+		document.getElementById(id).addEventListener('input', onDataChange));
+
+    document.getElementById('sel_size_dist').addEventListener('change', (e) => {
+        params.sizeDist = e.target.value;
+        updateInstances();
+    });
+
+    document.getElementById('sel_geometry').addEventListener('change', (e) => { 
+		params.geom = e.target.value; 
+		rebuildMesh(); 
+	});
+
+    document.getElementById('sel_hdri').addEventListener('change', (e) => { 
+		loadHDRI(e.target.value); 
+	});
+
+    function updateMaterial() {
+        material.metalness = parseFloat(document.getElementById('inp_metal').value);
+        material.roughness = parseFloat(document.getElementById('inp_rough').value);
+        material.transmission = parseFloat(document.getElementById('inp_transmission').value);
+		material.clearcoat = parseFloat(document.getElementById('inp_clearcoat').value);
+        const envInt = parseFloat(document.getElementById('inp_env_intensity').value);
+        material.envMapIntensity = envInt;
+    }
+    ['inp_metal', 'inp_rough', 'inp_transmission', 'inp_clearcoat', 'inp_env_intensity'].forEach(id => 
+		document.getElementById(id).addEventListener('input', updateMaterial));
+
+    function updateColors() {
+        params.gradient = document.getElementById('chk_gradient').checked;
+        params.colorMin.set(document.getElementById('inp_color_min').value);
+        params.colorMid.set(document.getElementById('inp_color_mid').value);
+        params.colorMax.set(document.getElementById('inp_color_max').value);
+        updateInstances();
+    }
+    ['chk_gradient', 'inp_color_min', 'inp_color_mid', 'inp_color_max'].forEach(id => 
+		document.getElementById(id).addEventListener('input', updateColors));
+
+    document.getElementById('chk_rotate').addEventListener('change', e => controls.autoRotate = e.target.checked);
+    document.getElementById('chk_stars').addEventListener('change', e => stars.visible = e.target.checked);
+    document.getElementById('chk_bg_anim').addEventListener('change', e => document.body.style.animationPlayState = e.target.checked ? 'running' : 'paused');
+
+    // Kamera Váltás
+    const fovContainer = document.getElementById('fov_container');
+    
+    document.getElementById('chk_perspective').addEventListener('change', e => {
+        const isPersp = e.target.checked;
+        
+        // UI frissítés
+        if(isPersp) fovContainer.classList.remove('disabled');
+        else fovContainer.classList.add('disabled');
+
+        // Kamera állapot mentés/csere
+        const pos = currentCamera.position.clone();
+        const rot = currentCamera.rotation.clone();
+        const target = controls.target.clone();
+
+        currentCamera = isPersp ? perspectiveCamera : orthoCamera;
+        
+        currentCamera.position.copy(pos);
+        currentCamera.rotation.copy(rot);
+        updateCameraOffset(currentCamera);
+
+        controls.object = currentCamera;
+        controls.target.copy(target); // Fontos, hogy ne ugráljon el a fókusz
+        controls.update();
+    });
+
+    // FOV változtatás
+    document.getElementById('inp_fov').addEventListener('input', (e) => {
+        params.fov = parseFloat(e.target.value);
+        document.getElementById('lbl_fov').textContent = params.fov;
+        perspectiveCamera.fov = params.fov;
+        perspectiveCamera.updateProjectionMatrix();
+    });
+
+    window.addEventListener('resize', () => {
+        const w = window.innerWidth; 
+		const h = window.innerHeight; 
+		const aspect = w / h;
+        perspectiveCamera.aspect = aspect; 
+		perspectiveCamera.updateProjectionMatrix();
+        orthoCamera.left = orthoSize * aspect / -2;
+        orthoCamera.right = orthoSize * aspect / 2;
+        orthoCamera.updateProjectionMatrix();
+		
+        renderer.setSize(w, h); 
+		updateCameraOffset(currentCamera);
+    });
+
+    function updateGPUInfo() {
+        if(renderer && renderer.info) {
+            document.getElementById('gpu-tris').textContent = renderer.info.render.triangles.toLocaleString();
+            document.getElementById('gpu-calls').textContent = renderer.info.render.calls;
+            document.getElementById('gpu-geo').textContent = renderer.info.memory.geometries;
+        }
+    }
+
+    rebuildMesh(); 
+	animate();
+    
+	function animate() { 
+        requestAnimationFrame(animate); 
+        stats.begin();
+        controls.update(); 
+        if(stars) { stars.rotation.y += 0.0003; stars.rotation.x += 0.0001; }
+        renderer.render(scene, currentCamera);
+        updateGPUInfo();
+        stats.end();
+    }
+</script>
+</body>
+</html>
