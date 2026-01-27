@@ -349,11 +349,11 @@
         <div class="control-group">
             <div class="label-row">
                 <span>Radius</span>
-                <span id="val_radius" class="value-display">0.60</span>
+                <span id="val_radius" class="value-display">1.0</span>
             </div>
             <div class="input-row">
                 <button class="step-btn" onclick="adjustValue('radius', -1)">-</button>
-                <input type="range" id="radius" min="0.1" max="2.0" value="0.6" step="0.01">
+                <input type="range" id="radius" min="0.1" max="2.0" value="1.0" step="0.01">
                 <button class="step-btn" onclick="adjustValue('radius', 1)">+</button>
             </div>
         </div>
@@ -482,9 +482,9 @@
         }
 
         vec3 col;
-        col.r = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.r * 5.0);
-        col.g = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.g * 5.0);
-        col.b = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.b * 5.0);
+        col.r = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.r * 3.14159);
+        col.g = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.g * 3.14159);
+        col.b = 0.5 + 0.5 * cos(total_z * 10.0 + u_color_offset.b * 3.14159);
 
         if (total_z <= 0.001) col = vec3(0.0);
 
