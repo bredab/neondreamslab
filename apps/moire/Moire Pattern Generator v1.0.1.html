@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Moire Pattern Generator v1.0.1</title>
+    <title>Moire Pattern Generator v1.0.2</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -18,7 +18,7 @@
             --accent-color: #3b82f6;
             --accent-hover: #2563eb;
             --border-color: #334155;
-            --input-bg: #0f172a;
+            --input-track: #475569;
         }
 
         body { 
@@ -37,7 +37,9 @@
             box-sizing: border-box;
         }
 
-        #rotate-warning { display: none; }
+        #rotate-warning { 
+            display: none; 
+        }
 
         /* Fullscreen button */
         #fullscreen-btn {
@@ -54,13 +56,16 @@
             font-size: 12px;
             text-transform: uppercase;
         }
+
         #fullscreen-btn:hover {
             background: var(--accent-color);
         }
 
         /* Force landscape on mobile */
         @media screen and (orientation: portrait) {
-            #app-wrapper, #fullscreen-btn { display: none !important; }
+            #app-wrapper, #fullscreen-btn { 
+                display: none !important; 
+            }
             
             #rotate-warning {
                 display: flex;
@@ -68,8 +73,10 @@
                 justify-content: center;
                 align-items: center;
                 position: fixed;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
+                top: 0; 
+                left: 0;
+                width: 100%; 
+                height: 100%;
                 background: #111;
                 color: #fff;
                 font-family: Arial, sans-serif;
@@ -125,10 +132,9 @@
         }
 
         canvas { 
-            /* Let the canvas size itself based on parent, not internal buffer */
             width: 100%;
             height: 100%;
-            object-fit: contain; /* Keep aspect ratio visually */
+            object-fit: contain;
             max-width: 100%;
             max-height: 100%;
             background: #000; 
@@ -286,7 +292,9 @@
 
         /* --- RESPONSIVE TWEAKS FOR MOBILE LANDSCAPE --- */
         @media screen and (max-width: 900px) and (orientation: landscape) {
-            body { padding: 5px; }
+            body { 
+                padding: 5px; 
+            }
             #app-wrapper {
                 padding: 10px;
                 gap: 10px;
@@ -303,7 +311,9 @@
                 font-size: 16px;
                 margin-bottom: 10px;
             }
-            .control-group { padding: 8px; }
+            .control-group { 
+                padding: 8px; 
+            }
         }
     </style>
 </head>
@@ -320,7 +330,7 @@
 <div id="app-wrapper">
     <!-- LEFT SIDE: CONTROLS -->
     <div id="controls">
-        <h1>Moire Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.1</span></h1>
+        <h1>Moire Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.2</span></h1>
         
         <div class="control-group">
             <div class="label-row">
@@ -403,107 +413,117 @@
 
     <!-- RIGHT SIDE: CANVAS -->
     <div id="canvas-container">
-        <canvas id="glcanvas" width="800" height="800"></canvas>
+        <canvas id="glcanvas"></canvas>
         <div id="watermark">neondreamslab.com</div>
     </div>
 </div>
 
+<!-- ========================= SHADERS ========================= -->
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+    attribute vec2 a_position;
+    
+    uniform float u_waves;
+    uniform float u_rot;
+    uniform float u_prec;
+    uniform float u_pointSize;
+    uniform vec2 u_resolution;
+
+    varying vec3 v_color; 
+    varying float v_discard;
+
+    // Optional palette function if needed for future extensions
+    vec3 palette(float t) {
+        float r = smoothstep(0.5, 0.8, t);
+        float g = smoothstep(0.2, 0.7, t) - smoothstep(0.8, 1.0, t); 
+        float b = smoothstep(0.0, 0.4, t) - smoothstep(0.6, 1.0, t);
+        return vec3(r, g, b);
+    }
+
+    void main() {
+        float xres = u_resolution.x;
+        vec2 pos = a_position * (xres / 2.0); 
+
+        float PI = 3.14159265359;
+        float fact1 = (xres / u_waves) / (2.0 * PI);
+
+        float s = pos.x * cos(u_rot) + pos.y * sin(u_rot);
+        float t = pos.y * cos(u_rot) - pos.x * sin(u_rot);
+
+        float z = (sin(s / fact1 + PI / 2.0) + sin(t / fact1 + PI / 2.0)) / 2.0;
+
+        if (z >= u_prec) {
+            float z_norm = (z - u_prec) / (1.0 - u_prec);
+            
+            vec3 baseColor = vec3(0.0);
+            baseColor.b = smoothstep(0.0, 0.4, z_norm); 
+            baseColor.g = smoothstep(0.3, 0.7, z_norm);
+            baseColor.r = smoothstep(0.6, 1.0, z_norm);
+
+            v_color = baseColor;
+            
+            gl_Position = vec4(a_position, 0.0, 1.0);
+            gl_PointSize = u_pointSize;
+            v_discard = 0.0;
+        } else {
+            gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+            gl_PointSize = 0.0;
+            v_discard = 1.0;
+        }
+    }
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+    precision mediump float;
+    
+    uniform float u_alpha;
+    varying vec3 v_color;
+    varying float v_discard;
+
+    void main() {
+        if (v_discard > 0.5) discard;
+
+        vec2 coord = 2.0 * gl_PointCoord - 1.0;
+        float dist = length(coord);
+        if (dist > 1.0) discard;
+
+        float glow = pow(1.0 - dist, 2.0);
+
+        gl_FragColor = vec4(v_color * glow, u_alpha);
+    }
+</script>
+
+<!-- ========================= APP LOGIC ========================= -->
+
 <script>
+    // 1. CONFIG & SETUP
+    const CONFIG = {
+        gridSteps: 500,
+        watermarkText: "neondreamslab.com"
+    };
+
     const canvas = document.getElementById('glcanvas');
     const container = document.getElementById("canvas-container");
-
-    // Eredeti kontextus beállítások + preserveDrawingBuffer
+    
+    // We need preserveDrawingBuffer to save images
     const gl = canvas.getContext('webgl', { 
         alpha: false, 
-        depth: false,
-        antialias: false,
+        depth: false, 
+        antialias: false, 
         preserveDrawingBuffer: true 
     });
 
-    if (!gl) { alert("Your browser does not support WebGL."); }
+    if (!gl) { 
+        alert("Your browser does not support WebGL."); 
+    }
 
-    // =============================================================
-    // VERTEX SHADER (UNCHANGED)
-    // =============================================================
-    const vsSource = `
-        attribute vec2 a_position;
-        
-        uniform float u_waves;
-        uniform float u_rot;
-        uniform float u_prec;
-        uniform float u_pointSize;
-        uniform vec2 u_resolution;
-
-        varying vec3 v_color; 
-        varying float v_discard;
-
-        vec3 palette(float t) {
-            float r = smoothstep(0.5, 0.8, t);
-            float g = smoothstep(0.2, 0.7, t) - smoothstep(0.8, 1.0, t); 
-            float b = smoothstep(0.0, 0.4, t) - smoothstep(0.6, 1.0, t);
-            return vec3(r, g, b);
-        }
-
-        void main() {
-            float xres = u_resolution.x;
-            vec2 pos = a_position * (xres / 2.0); 
-
-            float PI = 3.14159265359;
-            float fact1 = (xres / u_waves) / (2.0 * PI);
-
-            float s = pos.x * cos(u_rot) + pos.y * sin(u_rot);
-            float t = pos.y * cos(u_rot) - pos.x * sin(u_rot);
-
-            float z = (sin(s / fact1 + PI / 2.0) + sin(t / fact1 + PI / 2.0)) / 2.0;
-
-            if (z >= u_prec) {
-                float z_norm = (z - u_prec) / (1.0 - u_prec);
-                
-                vec3 baseColor = vec3(0.0);
-                baseColor.b = smoothstep(0.0, 0.4, z_norm); 
-                baseColor.g = smoothstep(0.3, 0.7, z_norm);
-                baseColor.r = smoothstep(0.6, 1.0, z_norm);
-
-                v_color = baseColor;
-                
-                gl_Position = vec4(a_position, 0.0, 1.0);
-                gl_PointSize = u_pointSize;
-                v_discard = 0.0;
-            } else {
-                gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-                gl_PointSize = 0.0;
-                v_discard = 1.0;
-            }
-        }
-    `;
-
-    // =============================================================
-    // FRAGMENT SHADER (UNCHANGED)
-    // =============================================================
-    const fsSource = `
-        precision mediump float;
-        
-        uniform float u_alpha;
-        varying vec3 v_color;
-        varying float v_discard;
-
-        void main() {
-            if (v_discard > 0.5) discard;
-
-            vec2 coord = 2.0 * gl_PointCoord - 1.0;
-            float dist = length(coord);
-            if (dist > 1.0) discard;
-
-            float glow = pow(1.0 - dist, 2.0);
-
-            gl_FragColor = vec4(v_color * glow, u_alpha);
-        }
-    `;
-
-    function createShader(gl, type, source) {
+    // 2. HELPER FUNCTIONS
+    function createShader(gl, type, sourceId) {
+        const source = document.getElementById(sourceId).text;
         const shader = gl.createShader(type);
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
+        
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
             console.error(gl.getShaderInfoLog(shader));
             return null;
@@ -511,20 +531,90 @@
         return shader;
     }
 
+    // Helper for stepping buttons and sliders
+    window.adjustValue = function(id, direction) {
+        const input = document.getElementById(id);
+        const step = parseFloat(input.step) || 1;
+        let newVal = parseFloat(input.value) + (step * direction);
+        
+        const min = parseFloat(input.min);
+        const max = parseFloat(input.max);
+
+        if (newVal < min) newVal = min;
+        if (newVal > max) newVal = max;
+        
+        // Float precision fix for smaller steps
+        if (step < 1) {
+            newVal = parseFloat(newVal.toFixed(3));
+        }
+        
+        input.value = newVal;
+        // The value change will be picked up in the render loop
+    };
+
+    window.toggleFullScreen = function() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    };
+
+    window.downloadImage = function(format) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        
+        // Draw WebGL canvas to temp canvas
+        ctx.drawImage(canvas, 0, 0);
+        
+        // Draw Watermark
+        ctx.save();
+        ctx.font = "bold 20px monospace";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+
+        ctx.fillText(CONFIG.watermarkText, tempCanvas.width - 20, tempCanvas.height - 15);
+        ctx.restore();
+        
+        // Export
+        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+        const link = document.createElement('a');
+        link.download = `moire_pattern_${Date.now()}.${format}`;
+        link.href = tempCanvas.toDataURL(mimeType, 0.9);
+        link.click();
+    };
+
+    // 3. WEBGL INITIALIZATION
     const program = gl.createProgram();
-    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
-    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, "vertex-shader"));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, "fragment-shader"));
     gl.linkProgram(program);
     gl.useProgram(program);
 
-    // --- Rács generálása ---
+    // --- Generate Grid Points ---
     const pointData = [];
-    const steps = 500; 
-    for (let y = 0; y < steps; y++) {
-        for (let x = 0; x < steps; x++) {
-            pointData.push((x / steps) * 2 - 1, (y / steps) * 2 - 1);
+    for (let y = 0; y < CONFIG.gridSteps; y++) {
+        for (let x = 0; x < CONFIG.gridSteps; x++) {
+            // Normalized coordinates -1 to 1
+            pointData.push(
+                (x / CONFIG.gridSteps) * 2 - 1, 
+                (y / CONFIG.gridSteps) * 2 - 1
+            );
         }
     }
+    
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pointData), gl.STATIC_DRAW);
@@ -542,11 +632,11 @@
         alpha: gl.getUniformLocation(program, 'u_alpha')
     };
 
-    // Eredeti Blend beállítások
+    // Blend settings for glowing effect
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
-    // --- UI Kezelés az új szerkezethez ---
+    // 4. UI REFERENCES
     const ui = {
         waves: document.getElementById('waves'),
         rot: document.getElementById('rot'),
@@ -563,40 +653,20 @@
         alpha: document.getElementById('val_alpha')
     };
 
-    // Helper for stepping buttons
-    window.adjustValue = function(id, direction) {
-        const input = document.getElementById(id);
-        const step = parseFloat(input.step) || 1;
-        const current = parseFloat(input.value);
-        const min = parseFloat(input.min);
-        const max = parseFloat(input.max);
-        
-        let newVal = current + (step * direction);
-        
-        // Clamp value
-        if (newVal < min) newVal = min;
-        if (newVal > max) newVal = max;
-
-        // Fix float precision issues
-        if (step < 1) {
-            newVal = parseFloat(newVal.toFixed(3));
-        }
-
-        input.value = newVal;
-    };
-
-    function update() {
-        // UI érték kijelzők frissítése
+    // 5. RENDER LOOP
+    function render() {
+        // Update UI Text Displays
         valDisp.waves.innerText = ui.waves.value;
         valDisp.rot.innerText   = parseFloat(ui.rot.value).toFixed(1);
         valDisp.rad.innerText   = ui.rad.value;
         valDisp.prec.innerText  = parseFloat(ui.prec.value).toFixed(3);
         valDisp.alpha.innerText = parseFloat(ui.alpha.value).toFixed(2);
 
-        // Renderelés
+        // Clear & Draw
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
+        // Pass Uniforms
         gl.uniform1f(locs.waves, parseFloat(ui.waves.value));
         gl.uniform1f(locs.rot, parseFloat(ui.rot.value) * (Math.PI / 180.0));
         gl.uniform1f(locs.prec, parseFloat(ui.prec.value));
@@ -604,13 +674,15 @@
         gl.uniform1f(locs.alpha, parseFloat(ui.alpha.value));
         gl.uniform2f(locs.res, canvas.width, canvas.height);
 
+        // Draw points
         gl.drawArrays(gl.POINTS, 0, pointData.length / 2);
 
-        requestAnimationFrame(update);
+        requestAnimationFrame(render);
     }
     
-    /* --- RESIZE HANDLER --- */
+    // 6. RESIZE HANDLING
     function resize() {
+        // Reset CSS size to container
         canvas.style.width = '100%';
         canvas.style.height = '100%';
 
@@ -621,6 +693,7 @@
         const newWidth = Math.floor(size);
         const newHeight = Math.floor(size);
 
+        // Only update if size changed
         if (canvas.width !== newWidth || canvas.height !== newHeight) {
             canvas.width = newWidth;
             canvas.height = newHeight;
@@ -630,59 +703,18 @@
         }
     }
 
-    /* --- FULLSCREEN TOGGLE --- */
-    function toggleFullScreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
-                console.log(`Error attempting to enable fullscreen: ${err.message}`);
-            });
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
-        }
-    }
-    
-    /* --- IMAGE DOWNLOAD --- */
-    window.downloadImage = function(format) {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
-        const ctx = tempCanvas.getContext('2d');
-        
-        ctx.drawImage(canvas, 0, 0);
-        
-        ctx.save();
-        ctx.font = "bold 20px monospace";
-        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "bottom";
-        
-        ctx.shadowColor = "rgba(0,0,0,0.5)";
-        ctx.shadowBlur = 4;
-        ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 1;
-
-        ctx.fillText("neondreamslab.com", tempCanvas.width - 20, tempCanvas.height - 15);
-        ctx.restore();
-        
-        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
-        const link = document.createElement('a');
-        link.download = `moire_pattern_${Date.now()}.${format}`;
-        link.href = tempCanvas.toDataURL(mimeType, 0.9);
-        link.click();
-    };
-
+    // Event Listeners
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', function() {
+        // Delay resize to allow layout to settle
         setTimeout(resize, 200);
         setTimeout(resize, 500);
     });
 
+    // Start
     setTimeout(resize, 100);
     resize();
-
-    update();
+    render();
 
 </script>
 </body>

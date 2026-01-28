@@ -2,12 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Carpethia v1.0.1</title>
     <style>
         :root {
-            /* Modern Kékes Színvilág */
             --bg-main: #0f172a;       /* Very dark blue */
             --bg-panel: #1e293b;      /* Panel background */
             --text-primary: #f1f5f9;  /* White-ish */
@@ -24,218 +26,195 @@
             color: var(--text-primary); 
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
-            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            /* Use dvh for better mobile support */
+            min-height: 100vh;
+            min-height: 100dvh; 
             overflow: hidden;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
-        /* --- LAYOUT --- */
+        /* --- MOBILE WARNING --- */
+        #rotate-warning { display: none; }
+        
+        @media screen and (orientation: portrait) {
+            #app-container, #fullscreen-btn { display: none !important; }
+            #rotate-warning {
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: #111; color: #fff; text-align: center; z-index: 9999;
+                padding: 20px; box-sizing: border-box;
+            }
+        }
+
+        /* --- FULLSCREEN BTN --- */
+        #fullscreen-btn {
+            position: fixed; top: 10px; right: 10px;
+            background: rgba(0,0,0,0.5); color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px; padding: 5px 10px; cursor: pointer;
+            z-index: 1000; font-size: 12px; text-transform: uppercase;
+        }
+        #fullscreen-btn:hover { background: var(--accent); }
+
+        /* --- MAIN LAYOUT --- */
         #app-container {
             display: flex;
+            background: var(--bg-panel);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            gap: 20px;
             width: 100%;
-            height: 100%;
+            max-width: 1200px;
+            max-height: 95vh;
+            max-height: 95dvh;
+            border: 1px solid var(--border);
+            box-sizing: border-box;
+            flex-direction: row;
+            align-items: stretch;
         }
 
         /* --- SIDEBAR --- */
         #sidebar {
-            width: 340px;
-            background: var(--bg-panel);
+            width: 320px;
+            min-width: 300px;
+            background: var(--bg-panel); /* Match parent for seamless look or slightly diff */
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             overflow-y: auto;
             flex-shrink: 0;
-            padding: 20px;
-            gap: 20px;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.3);
+            padding-right: 10px;
+            gap: 15px;
         }
 
-        /* Scrollbar styling for sidebar */
-        #sidebar::-webkit-scrollbar { width: 8px; }
-        #sidebar::-webkit-scrollbar-track { background: var(--bg-panel); }
-        #sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        /* Scrollbar styling */
+        #sidebar::-webkit-scrollbar { width: 6px; }
+        #sidebar::-webkit-scrollbar-track { background: transparent; }
+        #sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
         h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            text-align: center;
-            border-bottom: 2px solid var(--border);
-            padding-bottom: 15px;
+            margin: 0; font-size: 20px; font-weight: 600;
+            color: var(--accent); text-transform: uppercase; letter-spacing: 1px;
+            text-align: left; border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
         }
-        
-        h1 span { font-size: 12px; color: var(--text-secondary); vertical-align: middle; }
+        h1 span { font-size: 0.6em; color: var(--text-secondary); vertical-align: middle; }
 
         /* --- CONTROL BLOCKS --- */
         .control-block {
             background: rgba(0, 0, 0, 0.2);
-            padding: 15px;
+            padding: 12px;
             border-radius: 8px;
             border: 1px solid var(--border);
         }
 
         .control-block h3 {
-            margin: 0 0 12px 0;
-            font-size: 14px;
-            color: var(--text-primary);
-            text-transform: uppercase;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            margin: 0 0 10px 0; font-size: 13px; color: var(--text-primary);
+            text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 8px;
         }
-        
         .control-block h3::before {
-            content: '';
-            display: block;
-            width: 4px;
-            height: 14px;
-            background: var(--accent);
-            border-radius: 2px;
+            content: ''; display: block; width: 3px; height: 12px;
+            background: var(--accent); border-radius: 2px;
         }
 
-        /* --- INPUT ROWS --- */
-        .control-group {
-            margin-bottom: 12px;
-        }
+        .control-group { margin-bottom: 10px; }
 
         .label-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
+            display: flex; justify-content: space-between; font-size: 12px;
+            color: var(--text-secondary); margin-bottom: 5px; font-weight: 500;
         }
 
-        .value-display {
-            color: var(--accent);
-            font-family: monospace;
-            font-weight: bold;
-        }
+        .value-display { color: var(--accent); font-family: monospace; font-weight: bold; }
 
-        .input-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .input-row { display: flex; align-items: center; gap: 6px; }
 
-        /* --- BUTTONS --- */
+        /* --- BUTTONS & SLIDERS --- */
         .step-btn {
-            background: var(--border);
-            color: var(--text-primary);
-            border: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            font-weight: bold;
-            transition: background 0.2s;
-            user-select: none;
+            background: var(--border); color: var(--text-primary); border: none;
+            width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: bold; transition: background 0.2s; user-select: none;
         }
+        .step-btn:hover { background: var(--accent); }
+        .step-btn:active { transform: scale(0.95); }
 
-        .step-btn:hover {
-            background: var(--accent);
-        }
-
-        .step-btn:active {
-            transform: scale(0.95);
-        }
-
-        /* --- SLIDERS --- */
         input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            background: transparent;
-            margin: 0;
+            -webkit-appearance: none; width: 100%; background: transparent; height: 20px; margin: 0;
         }
-
-        input[type=range]:focus { outline: none; }
-
-        /* Webkit Slider Track */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 6px;
-            cursor: pointer;
-            background: var(--input-track);
-            border-radius: 3px;
-        }
-        
-        /* Webkit Slider Thumb */
         input[type=range]::-webkit-slider-thumb {
-            height: 16px;
-            width: 16px;
-            border-radius: 50%;
-            background: var(--accent);
-            cursor: pointer;
-            -webkit-appearance: none;
-            margin-top: -5px; /* centers thumb */
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: var(--accent); cursor: pointer; margin-top: -6px;
             box-shadow: 0 0 5px rgba(0,0,0,0.5);
-            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; cursor: pointer;
+            background: var(--input-track); border-radius: 2px; transform: translateY(8px);
         }
 
-        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
-
-        /* Firefox Support */
-        input[type=range]::-moz-range-track {
-            width: 100%;
-            height: 6px;
-            cursor: pointer;
-            background: var(--input-track);
-            border-radius: 3px;
-        }
-        input[type=range]::-moz-range-thumb {
-            height: 16px;
-            width: 16px;
-            border: none;
-            border-radius: 50%;
-            background: var(--accent);
-            cursor: pointer;
-        }
-
-        /* Colored Sliders for RGB */
+        /* Specific Color Sliders */
         #colR::-webkit-slider-thumb { background: #ef4444; }
         #colG::-webkit-slider-thumb { background: #22c55e; }
         #colB::-webkit-slider-thumb { background: #3b82f6; }
-        #colR::-moz-range-thumb { background: #ef4444; }
-        #colG::-moz-range-thumb { background: #22c55e; }
-        #colB::-moz-range-thumb { background: #3b82f6; }
 
-        /* --- CANVAS AREA --- */
+        /* --- EXPORT BUTTONS --- */
+        .export-row { display: flex; gap: 8px; margin-top: 5px; }
+        button.export-btn {
+            flex: 1; background: var(--bg-panel); color: var(--accent);
+            border: 1px solid var(--accent); border-radius: 4px; padding: 6px;
+            cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.2s;
+        }
+        button.export-btn:hover { background: var(--accent); color: white; }
+
+        /* --- CANVAS --- */
         #canvas-wrapper {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #000;
-            position: relative;
+            flex-grow: 1; display: flex; justify-content: center; align-items: center;
+            overflow: hidden; position: relative; min-width: 0; min-height: 0;
         }
 
         canvas {
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
-            border-radius: 4px;
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%; height: 100%; object-fit: contain;
+            background: #000; border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 1px solid #000; display: block;
+        }
+
+        #watermark {
+            position: absolute; bottom: 15px; right: 20px;
+            font-family: monospace; font-weight: bold; font-size: 14px;
+            color: rgba(255, 255, 255, 0.5); pointer-events: none; user-select: none;
+            background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;
         }
 
         .info-text {
-            font-size: 11px;
-            color: var(--text-secondary);
-            text-align: center;
-            margin-top: 5px;
-            font-style: italic;
+            font-size: 11px; color: var(--text-secondary); text-align: center;
+            margin-top: 5px; font-style: italic;
         }
-        
         .active-range { color: var(--text-primary); font-weight: bold; }
+
+        /* --- RESPONSIVE --- */
+        @media screen and (max-width: 900px) and (orientation: landscape) {
+            body { padding: 5px; }
+            #app-container { padding: 10px; gap: 10px; max-height: 98dvh; }
+            #sidebar { width: 260px; min-width: 260px; padding-left: 10px; border-left: none; }
+            h1 { font-size: 16px; margin-bottom: 10px; }
+            .control-block { padding: 8px; }
+        }
 
     </style>
 </head>
 <body>
+
+<div id="rotate-warning">
+    <div style="font-size: 50px; margin-bottom: 20px;">🔄</div>
+    <h2>Please Rotate Your Device</h2>
+    <p>This experiment requires landscape mode.</p>
+</div>
+
+<button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
 
 <div id="app-container">
     <!-- LEFT SIDEBAR -->
@@ -385,19 +364,32 @@
                 </div>
             </div>
         </div>
+
+        <!-- EXPORT SECTION -->
+        <div class="control-block">
+            <h3>Export</h3>
+            <div class="export-row">
+                <button class="export-btn" onclick="downloadImage('png')">PNG</button>
+                <button class="export-btn" onclick="downloadImage('jpg')">JPG</button>
+            </div>
+        </div>
+
     </div>
 
     <!-- RIGHT CANVAS -->
     <div id="canvas-wrapper">
-        <canvas id="glCanvas" width="800" height="800"></canvas>
+        <canvas id="glCanvas"></canvas>
+        <div id="watermark">neondreamslab.com</div>
     </div>
 </div>
 
-<!-- ========================= SHADER CODE (UNCHANGED) ========================= -->
+<!-- ========================= SHADERS ========================= -->
 
 <script id="vertex-shader" type="x-shader/x-vertex">
     attribute vec2 position;
-    void main() { gl_Position = vec4(position, 0.0, 1.0); }
+    void main() { 
+        gl_Position = vec4(position, 0.0, 1.0); 
+    }
 </script>
 
 <script id="fragment-shader" type="x-shader/x-fragment">
@@ -483,21 +475,36 @@
 <!-- ========================= APP LOGIC ========================= -->
 
 <script>
+    // 1. CONFIG
+    const CONFIG = {
+        watermarkText: "neondreamslab.com"
+    };
+
+    // 2. SETUP
     const canvas = document.getElementById("glCanvas");
-    const gl = canvas.getContext("webgl");
+    const container = document.getElementById("canvas-wrapper");
+    // PreserveDrawingBuffer needed for saving images
+    const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
+    
     if (!gl) alert("WebGL not supported!");
 
-    function createShader(gl, type, source) {
+    // 3. SHADER HELPERS
+    function createShader(gl, type, sourceId) {
+        const source = document.getElementById(sourceId).text;
         const shader = gl.createShader(type);
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return null;
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            return null;
+        }
         return shader;
     }
 
+    // 4. INIT WEBGL
     const program = gl.createProgram();
-    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, document.getElementById("vertex-shader").text));
-    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, document.getElementById("fragment-shader").text));
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, "vertex-shader"));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, "fragment-shader"));
     gl.linkProgram(program);
     gl.useProgram(program);
 
@@ -521,6 +528,7 @@
         gam: gl.getUniformLocation(program, "u_gamma")
     };
 
+    // 5. UI REFERENCES
     const ui = {
         offset: document.getElementById("offset"),
         width: document.getElementById("width"),
@@ -548,7 +556,7 @@
         gamma: document.getElementById("val_gamma")
     };
 
-    // Helper function for the +/- buttons
+    // 6. EVENT HANDLERS
     window.adjustValue = function(id, direction) {
         const input = document.getElementById(id);
         const step = parseFloat(input.step) || 1;
@@ -558,41 +566,92 @@
         
         let newVal = current + (step * direction);
         
-        // Float precision fix
         if (step < 1) {
-            // Count decimals to fix precision
             const decimals = input.step.split('.')[1] ? input.step.split('.')[1].length : 0;
             newVal = parseFloat(newVal.toFixed(decimals));
         }
 
-        // Clamp
         if (newVal < min) newVal = min;
         if (newVal > max) newVal = max;
 
         input.value = newVal;
-        // The render loop will pick this up automatically
     };
+
+    window.toggleFullScreen = function() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    };
+
+    window.downloadImage = function(format) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        
+        // Draw WebGL canvas
+        ctx.drawImage(canvas, 0, 0);
+        
+        // Watermark
+        ctx.save();
+        ctx.font = "bold 20px monospace";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 4; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
+        ctx.fillText(CONFIG.watermarkText, tempCanvas.width - 20, tempCanvas.height - 15);
+        ctx.restore();
+        
+        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+        const link = document.createElement('a');
+        link.download = `carpethia_${Date.now()}.${format}`;
+        link.href = tempCanvas.toDataURL(mimeType, 0.9);
+        link.click();
+    };
+
+    // 7. RESIZE & RENDER
+    function resize() {
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        const size = Math.min(w, h); // Keep aspect ratio 1:1
+
+        const newWidth = Math.floor(size);
+        const newHeight = Math.floor(size);
+
+        if (canvas.width !== newWidth || canvas.height !== newHeight) {
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+    }
 
     function render() {
         let offVal = parseFloat(ui.offset.value);
         let widVal = parseFloat(ui.width.value);
         
-        // Update UI Text
+        // Update UI
         disp.offset.innerText = offVal.toFixed(4);
         disp.width.innerText = widVal.toFixed(5);
         disp.range.innerText = `${offVal.toFixed(4)} - ${(offVal + widVal).toFixed(4)}`;
-        
         disp.freq.innerText = parseFloat(ui.freq.value).toFixed(1);
         disp.rot.innerText = parseFloat(ui.rot.value).toFixed(2);
         disp.den.innerText = ui.density.value;
         disp.rad.innerText = parseFloat(ui.radius.value).toFixed(3);
-        
         disp.colR.innerText = parseFloat(ui.colR.value).toFixed(1);
         disp.colG.innerText = parseFloat(ui.colG.value).toFixed(1);
         disp.colB.innerText = parseFloat(ui.colB.value).toFixed(1);
         disp.gamma.innerText = parseFloat(ui.gamma.value).toFixed(1);
 
-        // Update WebGL Uniforms
+        // WebGL Uniforms
         gl.uniform2f(locs.res, canvas.width, canvas.height);
         gl.uniform1f(locs.den, parseFloat(ui.density.value));
         gl.uniform1f(locs.rad, parseFloat(ui.radius.value));
@@ -607,6 +666,16 @@
         requestAnimationFrame(render);
     }
     
+    // Listeners
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', function() {
+        setTimeout(resize, 200);
+        setTimeout(resize, 500);
+    });
+
+    // Start
+    setTimeout(resize, 100);
+    resize();
     render();
 </script>
 
