@@ -7,28 +7,27 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Carpethia v1.0.1</title>
+    <title>Carpethia v1.1.0</title>
     <style>
         :root {
-            --bg-main: #0f172a;       /* Very dark blue */
-            --bg-panel: #1e293b;      /* Panel background */
-            --text-primary: #f1f5f9;  /* White-ish */
-            --text-secondary: #94a3b8; /* Muted blue-grey */
-            --accent: #3b82f6;        /* Bright Blue */
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
             --accent-hover: #2563eb;
             --border: #334155;
-            --input-track: #475569;
+            --input-bg: #0f172a;
         }
 
         body { 
             margin: 0; 
-            background: var(--bg-main); 
+            background: var(--bg-primary); 
             color: var(--text-primary); 
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             align-items: center;
             justify-content: center;
-            /* Use dvh for better mobile support */
             min-height: 100vh;
             min-height: 100dvh; 
             overflow: hidden;
@@ -36,7 +35,6 @@
             box-sizing: border-box;
         }
 
-        /* --- MOBILE WARNING --- */
         #rotate-warning { display: none; }
         
         @media screen and (orientation: portrait) {
@@ -62,7 +60,7 @@
         /* --- MAIN LAYOUT --- */
         #app-container {
             display: flex;
-            background: var(--bg-panel);
+            background: var(--bg-secondary);
             padding: 20px;
             border-radius: 16px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.6);
@@ -81,14 +79,13 @@
         #sidebar {
             width: 320px;
             min-width: 300px;
-            background: var(--bg-panel); /* Match parent for seamless look or slightly diff */
-            border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             overflow-y: auto;
             flex-shrink: 0;
             padding-right: 10px;
             gap: 15px;
+            border-right: 1px solid var(--border);
         }
 
         /* Scrollbar styling */
@@ -105,23 +102,23 @@
         h1 span { font-size: 0.6em; color: var(--text-secondary); vertical-align: middle; }
 
         /* --- CONTROL BLOCKS --- */
-        .control-block {
+        .control-group {
             background: rgba(0, 0, 0, 0.2);
             padding: 12px;
             border-radius: 8px;
             border: 1px solid var(--border);
         }
 
-        .control-block h3 {
+        .control-group h3 {
             margin: 0 0 10px 0; font-size: 13px; color: var(--text-primary);
             text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 8px;
         }
-        .control-block h3::before {
+        .control-group h3::before {
             content: ''; display: block; width: 3px; height: 12px;
             background: var(--accent); border-radius: 2px;
         }
 
-        .control-group { margin-bottom: 10px; }
+        .control-item { margin-bottom: 10px; }
 
         .label-row {
             display: flex; justify-content: space-between; font-size: 12px;
@@ -133,14 +130,14 @@
         .input-row { display: flex; align-items: center; gap: 6px; }
 
         /* --- BUTTONS & SLIDERS --- */
-        .step-btn {
+        .adjust-btn {
             background: var(--border); color: var(--text-primary); border: none;
             width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             font-size: 14px; font-weight: bold; transition: background 0.2s; user-select: none;
         }
-        .step-btn:hover { background: var(--accent); }
-        .step-btn:active { transform: scale(0.95); }
+        .adjust-btn:hover { background: var(--accent); }
+        .adjust-btn:active { transform: scale(0.95); }
 
         input[type=range] {
             -webkit-appearance: none; width: 100%; background: transparent; height: 20px; margin: 0;
@@ -152,7 +149,7 @@
         }
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%; height: 4px; cursor: pointer;
-            background: var(--input-track); border-radius: 2px; transform: translateY(8px);
+            background: var(--input-bg); border-radius: 2px; transform: translateY(8px);
         }
 
         /* Specific Color Sliders */
@@ -163,23 +160,22 @@
         /* --- EXPORT BUTTONS --- */
         .export-row { display: flex; gap: 8px; margin-top: 5px; }
         button.export-btn {
-            flex: 1; background: var(--bg-panel); color: var(--accent);
+            flex: 1; background: var(--bg-secondary); color: var(--accent);
             border: 1px solid var(--accent); border-radius: 4px; padding: 6px;
             cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.2s;
         }
         button.export-btn:hover { background: var(--accent); color: white; }
 
         /* --- CANVAS --- */
-        #canvas-wrapper {
+        #canvas-container {
             flex-grow: 1; display: flex; justify-content: center; align-items: center;
             overflow: hidden; position: relative; min-width: 0; min-height: 0;
+            background: #000; border-radius: 8px; border: 1px solid #000;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
         }
 
         canvas {
-            width: 100%; height: 100%; object-fit: contain;
-            background: #000; border-radius: 8px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
-            border: 1px solid #000; display: block;
+            width: 100%; height: 100%; object-fit: contain; display: block;
         }
 
         #watermark {
@@ -201,7 +197,7 @@
             #app-container { padding: 10px; gap: 10px; max-height: 98dvh; }
             #sidebar { width: 260px; min-width: 260px; padding-left: 10px; border-left: none; }
             h1 { font-size: 16px; margin-bottom: 10px; }
-            .control-block { padding: 8px; }
+            .control-group { padding: 8px; }
         }
 
     </style>
@@ -219,33 +215,33 @@
 <div id="app-container">
     <!-- LEFT SIDEBAR -->
     <div id="sidebar">
-        <h1>Carpethia <span>v1.0.1</span></h1>
+        <h1>Carpethia <span>v1.1.0</span></h1>
 
         <!-- Logic Gate Section -->
-        <div class="control-block">
+        <div class="control-group">
             <h3>Logic Gate (Threshold)</h3>
             
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span>Threshold Offset (Start)</span>
                     <span id="val_offset" class="value-display">0.9</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('offset', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('offset', -1)">-</button>
                     <input type="range" id="offset" min="0.0" max="1.0" value="0.9" step="0.0001">
-                    <button class="step-btn" onclick="adjustValue('offset', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('offset', 1)">+</button>
                 </div>
             </div>
 
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span>Threshold Width</span>
                     <span id="val_width" class="value-display">0.05</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('width', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('width', -1)">-</button>
                     <input type="range" id="width" min="0.00001" max="0.1" value="0.05" step="0.00001">
-                    <button class="step-btn" onclick="adjustValue('width', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('width', 1)">+</button>
                 </div>
             </div>
 
@@ -255,118 +251,118 @@
         </div>
 
         <!-- Interference Section -->
-        <div class="control-block">
+        <div class="control-group">
             <h3>Interference</h3>
             
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span>Wave Frequency</span>
                     <span id="val_freq" class="value-display">42.0</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('freq', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('freq', -1)">-</button>
                     <input type="range" id="freq" min="1.0" max="50.0" value="42.0" step="0.1">
-                    <button class="step-btn" onclick="adjustValue('freq', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('freq', 1)">+</button>
                 </div>
             </div>
 
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span>Grid Rotation (deg)</span>
                     <span id="val_rot" class="value-display">0.0</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('rot', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('rot', -1)">-</button>
                     <input type="range" id="rot" min="0.0" max="45.0" value="0.0" step="0.01">
-                    <button class="step-btn" onclick="adjustValue('rot', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('rot', 1)">+</button>
                 </div>
             </div>
         </div>
 
         <!-- Appearance Section -->
-        <div class="control-block">
+        <div class="control-group">
             <h3>Appearance</h3>
             
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span>Grid Density</span>
                     <span id="val_density" class="value-display">46</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('density', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('density', -1)">-</button>
                     <input type="range" id="density" min="10" max="200" value="46" step="1">
-                    <button class="step-btn" onclick="adjustValue('density', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('density', 1)">+</button>
                 </div>
             </div>
 
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span>Sphere Radius (Fixed)</span>
                     <span id="val_radius" class="value-display">0.2</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('radius', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('radius', -1)">-</button>
                     <input type="range" id="radius" min="0.001" max="0.25" value="0.2" step="0.001">
-                    <button class="step-btn" onclick="adjustValue('radius', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('radius', 1)">+</button>
                 </div>
             </div>
 
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span>Gamma Correction</span>
                     <span id="val_gamma" class="value-display">0.6</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('gamma', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('gamma', -1)">-</button>
                     <input type="range" id="gamma" min="0.5" max="3.0" value="0.6" step="0.1">
-                    <button class="step-btn" onclick="adjustValue('gamma', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('gamma', 1)">+</button>
                 </div>
             </div>
         </div>
 
         <!-- Colors Section -->
-        <div class="control-block">
+        <div class="control-group">
             <h3>Color Phases</h3>
             
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span style="color:#ef4444">Red Phase</span>
                     <span id="val_colR" class="value-display">0.0</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('colR', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('colR', -1)">-</button>
                     <input type="range" id="colR" min="0.0" max="6.28" value="0.0" step="0.1">
-                    <button class="step-btn" onclick="adjustValue('colR', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('colR', 1)">+</button>
                 </div>
             </div>
 
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span style="color:#22c55e">Green Phase</span>
                     <span id="val_colG" class="value-display">2.0</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('colG', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('colG', -1)">-</button>
                     <input type="range" id="colG" min="0.0" max="6.28" value="2.0" step="0.1">
-                    <button class="step-btn" onclick="adjustValue('colG', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('colG', 1)">+</button>
                 </div>
             </div>
 
-            <div class="control-group">
+            <div class="control-item">
                 <div class="label-row">
                     <span style="color:#3b82f6">Blue Phase</span>
                     <span id="val_colB" class="value-display">4.0</span>
                 </div>
                 <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('colB', -1)">-</button>
+                    <button class="adjust-btn" onclick="adjustValue('colB', -1)">-</button>
                     <input type="range" id="colB" min="0.0" max="6.28" value="4.0" step="0.1">
-                    <button class="step-btn" onclick="adjustValue('colB', 1)">+</button>
+                    <button class="adjust-btn" onclick="adjustValue('colB', 1)">+</button>
                 </div>
             </div>
         </div>
 
         <!-- EXPORT SECTION -->
-        <div class="control-block">
+        <div class="control-group">
             <h3>Export</h3>
             <div class="export-row">
                 <button class="export-btn" onclick="downloadImage('png')">PNG</button>
@@ -377,7 +373,7 @@
     </div>
 
     <!-- RIGHT CANVAS -->
-    <div id="canvas-wrapper">
+    <div id="canvas-container">
         <canvas id="glCanvas"></canvas>
         <div id="watermark">neondreamslab.com</div>
     </div>
@@ -482,7 +478,7 @@
 
     // 2. SETUP
     const canvas = document.getElementById("glCanvas");
-    const container = document.getElementById("canvas-wrapper");
+    const container = document.getElementById("canvas-container");
     // PreserveDrawingBuffer needed for saving images
     const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
     
