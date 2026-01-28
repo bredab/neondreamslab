@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <!-- PWA capable tags -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Simple Pattern Generator v1.0.1</title>
+    <title>Simple Pattern Generator v1.1.0</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -18,7 +18,7 @@
             --accent-color: #3b82f6;
             --accent-hover: #2563eb;
             --border-color: #334155;
-            --input-bg: #0f172a;
+            --input-track: #475569;
         }
 
         body { 
@@ -29,7 +29,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            /* Use dvh (dynamic viewport height) for mobile browsers */
             min-height: 100vh;
             min-height: 100dvh; 
             overflow: hidden; 
@@ -37,9 +36,34 @@
             box-sizing: border-box;
         }
 
-		#rotate-warning { display: none; }
+        #rotate-warning { 
+            display: none; 
+        }
+        
+        @media screen and (orientation: portrait) {
+            #app-wrapper, #fullscreen-btn { 
+                display: none !important; 
+            }
+            #rotate-warning {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                position: fixed;
+                top: 0; 
+                left: 0;
+                width: 100%; 
+                height: 100%;
+                background: #111;
+                color: #fff;
+                font-family: Arial, sans-serif;
+                text-align: center;
+                z-index: 9999;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+        }
 
-        /* Fullscreen button */
         #fullscreen-btn {
             position: fixed;
             top: 10px;
@@ -54,30 +78,9 @@
             font-size: 12px;
             text-transform: uppercase;
         }
+        
         #fullscreen-btn:hover {
             background: var(--accent-color);
-        }
-
-        /* Force landscape on mobile */
-        @media screen and (orientation: portrait) {
-            #app-wrapper, #fullscreen-btn { display: none !important; }
-            
-            #rotate-warning {
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                position: fixed;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                background: #111;
-                color: #fff;
-                font-family: Arial, sans-serif;
-                text-align: center;
-                z-index: 9999;
-                padding: 20px;
-                box-sizing: border-box;
-            }
         }
 
         #app-wrapper {
@@ -89,7 +92,6 @@
             gap: 20px;
             width: 100%;
             max-width: 1200px;
-            /* Constrain height to fit in viewport with some margin */
             max-height: 95vh;
             max-height: 95dvh;
             border: 1px solid var(--border-color);
@@ -109,7 +111,6 @@
             border-right: 1px solid var(--border-color);
             overflow-y: auto;
             box-sizing: border-box;
-            /* Scroll handle area on the left */
             padding-left: 0; 
         }
 
@@ -126,14 +127,11 @@
         }
 
         canvas { 
-            /* Let the canvas size itself based on parent, not internal buffer */
             width: 100%;
             height: 100%;
-            object-fit: contain; /* Keep aspect ratio visually */
-            
+            object-fit: contain;
             max-width: 100%;
             max-height: 100%;
-            
             background: #000; 
             border-radius: 8px;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
@@ -250,7 +248,6 @@
             appearance: none;
             width: 100%; 
             background: transparent; 
-            /* Increase touch area height for better usability but keep track thin visually */
             height: 20px; 
             margin: 0;
         }
@@ -263,7 +260,7 @@
             border-radius: 50%;
             background: var(--accent-color);
             cursor: pointer;
-            margin-top: -6px; /* relative to track height if using custom track */
+            margin-top: -6px; 
             box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
         }
 
@@ -273,40 +270,28 @@
             cursor: pointer;
             background: var(--border-color);
             border-radius: 2px;
-            /* Vertically center the track */
             transform: translateY(8px); 
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            height: 16px;
-            width: 16px;
-            border: none;
-            border-radius: 50%;
-            background: var(--accent-color);
-            cursor: pointer;
         }
 
         .color-label-r { color: #f87171 !important; }
         .color-label-g { color: #4ade80 !important; }
         .color-label-b { color: #60a5fa !important; }
 
-        /* --- RESPONSIVE TWEAKS FOR MOBILE LANDSCAPE --- */
         @media screen and (max-width: 900px) and (orientation: landscape) {
-            body {
-                padding: 5px; /* Minimal padding on mobile */
+            body { 
+                padding: 5px; 
             }
             #app-wrapper {
                 padding: 10px;
                 gap: 10px;
-                max-height: 98dvh; /* Use almost full height */
+                max-height: 98dvh;
             }
              #controls { 
                 width: 260px; 
                 min-width: 260px;
                 gap: 10px;
-                /* SAFETY SCROLL AREA ON THE LEFT */
                 padding-left: 30px; 
-                border-left: 1px solid rgba(255,255,255,0.05); /* Visual cue */
+                border-left: 1px solid rgba(255,255,255,0.05);
             }
             h1 {
                 font-size: 16px;
@@ -322,9 +307,9 @@
 <body>
 
 <div id="rotate-warning">
-        <div style="font-size: 50px; margin-bottom: 20px;">🔄</div>
-        <h2>Please Rotate Your Device</h2>
-        <p>This experiment requires landscape mode.</p>
+    <div style="font-size: 50px; margin-bottom: 20px;">🔄</div>
+    <h2>Please Rotate Your Device</h2>
+    <p>This experiment requires landscape mode.</p>
 </div>
 
 <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
@@ -332,7 +317,7 @@
 <div id="app-wrapper">
     <!-- LEFT SIDE: CONTROLS -->
     <div id="controls">
-        <h1>Simple Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.0.1</span></h1>
+        <h1>Simple Pattern Generator <span style="font-size:0.6em; color: var(--text-muted)">v1.1.0</span></h1>
         
         <div class="control-group">
             <div class="label-row">
@@ -428,12 +413,13 @@
 
     <!-- RIGHT SIDE: CANVAS -->
     <div id="canvas-container">
-        <canvas id="glCanvas" width="800" height="800"></canvas>
+        <canvas id="glCanvas"></canvas>
         <div id="watermark">neondreamslab.com</div>
     </div>
 </div>
 
-<!-- SHADERS (UNCHANGED FUNCTIONALITY) -->
+<!-- ========================= SHADERS ========================= -->
+
 <script id="vertex-shader" type="x-shader/x-vertex">
     attribute vec2 position;
     void main() {
@@ -472,6 +458,7 @@
         
         float total_z = 0.0;
 
+        // Check neighboring cells for overlapping spheres
         for (int y = -1; y <= 1; y++) {
             for (int x = -1; x <= 1; x++) {
                 vec2 neighbor = vec2(float(x), float(y));
@@ -494,14 +481,31 @@
     }
 </script>
 
+<!-- ========================= APP LOGIC ========================= -->
+
 <script>
+    // 1. CONFIG
+    const CONFIG = {
+        watermarkText: "neondreamslab.com"
+    };
+
+    // 2. SETUP
     const canvas = document.getElementById("glCanvas");
-    const container = document.getElementById("canvas-container"); // Get container reference
-    const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true }); // Important for saving!
+    const container = document.getElementById("canvas-container"); 
+    
+    // Create WebGL context (preserveDrawingBuffer needed for export)
+    const gl = canvas.getContext("webgl", { 
+        preserveDrawingBuffer: true,
+        alpha: false,
+        depth: false,
+        antialias: false
+    });
 
     if (!gl) alert("WebGL is not supported in your browser!");
 
-    function createShader(gl, type, source) {
+    // 3. SHADER HELPERS
+    function createShader(gl, type, sourceId) {
+        const source = document.getElementById(sourceId).text;
         const shader = gl.createShader(type);
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
@@ -513,9 +517,10 @@
         return shader;
     }
 
+    // 4. WEBGL INITIALIZATION
     const program = gl.createProgram();
-    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, document.getElementById("vertex-shader").text));
-    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, document.getElementById("fragment-shader").text));
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, "vertex-shader"));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, "fragment-shader"));
     gl.linkProgram(program);
     gl.useProgram(program);
 
@@ -536,6 +541,7 @@
         gam: gl.getUniformLocation(program, "u_gamma")
     };
 
+    // 5. UI REFERENCES
     const ui = {
         density: document.getElementById("density"),
         radius: document.getElementById("radius"),
@@ -556,26 +562,11 @@
         gamma: document.getElementById("val_gamma")
     };
 
-    // Helper for stepping buttons
-    window.adjustValue = function(id, direction) {
-        const input = document.getElementById(id);
-        const step = parseFloat(input.step) || 1;
-        const current = parseFloat(input.value);
-        const min = parseFloat(input.min);
-        const max = parseFloat(input.max);
-        
-        let newVal = current + (step * direction);
-        
-        // Clamp value
-        if (newVal < min) newVal = min;
-        if (newVal > max) newVal = max;
-
-        input.value = newVal;
-        // The render loop will pick up the new value automatically
-    };
-
+    // 6. EVENT HANDLERS (Render on Demand)
+    
+    // Draw function - Called only when needed
     function render() {
-        // 1. Update text displays
+        // Update text displays
         valDisp.density.innerText = ui.density.value;
         valDisp.radius.innerText  = parseFloat(ui.radius.value).toFixed(2);
         valDisp.rotation.innerText = parseFloat(ui.rotation.value).toFixed(1);
@@ -584,7 +575,7 @@
         valDisp.offB.innerText = parseFloat(ui.offB.value).toFixed(2);
         valDisp.gamma.innerText = parseFloat(ui.gamma.value).toFixed(1);
 
-        // 2. Pass values to Shader
+        // Pass values to Shader
         gl.uniform2f(locs.res, canvas.width, canvas.height);
         gl.uniform1f(locs.den, parseFloat(ui.density.value));
         gl.uniform1f(locs.rad, parseFloat(ui.radius.value));
@@ -596,98 +587,108 @@
         );
         gl.uniform1f(locs.gam, parseFloat(ui.gamma.value));
 
-        // 3. Draw
+        // Draw
         gl.drawArrays(gl.TRIANGLES, 0, 6);
-        requestAnimationFrame(render);
     }
 
-	/* --- 2. RESIZE HANDLER --- */
+    // Helper for stepping buttons
+    window.adjustValue = function(id, direction) {
+        const input = document.getElementById(id);
+        const step = parseFloat(input.step) || 1;
+        let newVal = parseFloat(input.value) + (step * direction);
+        
+        const min = parseFloat(input.min);
+        const max = parseFloat(input.max);
+        
+        if (newVal < min) newVal = min;
+        if (newVal > max) newVal = max;
+
+        // Fix float precision issues
+        if (step < 1) {
+            const decimals = input.step.split('.')[1] ? input.step.split('.')[1].length : 0;
+            newVal = parseFloat(newVal.toFixed(decimals));
+        }
+
+        input.value = newVal;
+        
+        // Trigger render
+        requestAnimationFrame(render);
+    };
+
+    // Attach listeners to all inputs for immediate rendering
+    document.querySelectorAll('input[type="range"]').forEach(input => {
+        input.addEventListener('input', () => requestAnimationFrame(render));
+    });
+
+	// Resize Handler
 	function resize() {
-        // RESET styles so container can grow/shrink naturally
         canvas.style.width = '100%';
         canvas.style.height = '100%';
 
-        // Find the smallest dimension of the container to make it square
         const w = container.clientWidth;
         const h = container.clientHeight;
         const size = Math.min(w, h);
 
-        // Update canvas display size
         const newWidth = Math.floor(size);
         const newHeight = Math.floor(size);
 
 		if (canvas.width !== newWidth || canvas.height !== newHeight) {
             canvas.width = newWidth;
             canvas.height = newHeight;
-            // Also explicitly set style to force reflow if needed
             canvas.style.width = newWidth + 'px';
             canvas.style.height = newHeight + 'px';
             gl.viewport(0, 0, canvas.width, canvas.height);
         }
+        
+        requestAnimationFrame(render);
 	}
 
-    /* --- FULLSCREEN TOGGLE --- */
-    function toggleFullScreen() {
+    window.toggleFullScreen = function() {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
                 console.log(`Error attempting to enable fullscreen: ${err.message}`);
             });
         } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
+            if (document.exitFullscreen) document.exitFullscreen();
         }
-    }
+    };
     
-    /* --- IMAGE DOWNLOAD --- */
     window.downloadImage = function(format) {
-        // 1. Create a temporary 2D canvas
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width;
         tempCanvas.height = canvas.height;
         const ctx = tempCanvas.getContext('2d');
         
-        // 2. Draw the WebGL content
-        // IMPORTANT: WebGL context must have preserveDrawingBuffer: true (set in getContext)
+        // Draw WebGL content
         ctx.drawImage(canvas, 0, 0);
         
-        // 3. Draw Watermark
+        // Draw Watermark
         ctx.save();
         ctx.font = "bold 20px monospace";
         ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
         ctx.textAlign = "right";
         ctx.textBaseline = "bottom";
         
-        // Add a slight shadow for better visibility
-        ctx.shadowColor = "rgba(0,0,0,0.5)";
-        ctx.shadowBlur = 4;
-        ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 1;
-
-        // Position: bottom right
-        ctx.fillText("neondreamslab.com", tempCanvas.width - 20, tempCanvas.height - 15);
+        ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 4; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
+        ctx.fillText(CONFIG.watermarkText, tempCanvas.width - 20, tempCanvas.height - 15);
         ctx.restore();
         
-        // 4. Convert to blob and download
         const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
         const link = document.createElement('a');
-        link.download = `pattern_${Date.now()}.${format}`;
-        link.href = tempCanvas.toDataURL(mimeType, 0.9); // 0.9 quality for jpg
+        link.download = `simple_pattern_${Date.now()}.${format}`;
+        link.href = tempCanvas.toDataURL(mimeType, 0.9);
         link.click();
     };
 
 	window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', function() {
-        // Small delay to allow layout to settle after rotation
         setTimeout(resize, 200);
-        setTimeout(resize, 500); // safety check
+        setTimeout(resize, 500);
     });
 
-    // Initial sizing
+    // Start
 	setTimeout(resize, 100);
-	resize(); 
-   
-    render();
+	resize();
 </script>
 
 </body>
