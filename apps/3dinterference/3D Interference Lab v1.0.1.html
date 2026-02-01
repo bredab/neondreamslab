@@ -498,7 +498,7 @@
 		epsilon: 0.5, 
 		periods: 1.0, 
 		size: 1.0,
-        geom: 'sphere',
+        geom: 'octahedron',
 		sizeDist: 'uniform',
         metalness: 0.3, 
 		roughness: 0.0, 
@@ -697,12 +697,12 @@
 		}
         let geometry;
         switch(params.geom) {
+            case 'sphere': geometry = new THREE.SphereGeometry(0.6, 32, 32); break;
             case 'cube': geometry = new THREE.BoxGeometry(1, 1, 1); break;
 			case 'cuber': geometry = new RoundedBoxGeometry(1, 1, 1, 4, 0.1); break;
-            case 'octahedron': geometry = new THREE.OctahedronGeometry(0.7, 0); break;
             case 'icosahedron': geometry = new THREE.IcosahedronGeometry(0.6, 0); break;
             case 'dodecahedron': geometry = new THREE.DodecahedronGeometry(0.6, 0); break;
-            default: geometry = new THREE.SphereGeometry(0.6, 32, 32); break;
+            default: geometry = new THREE.OctahedronGeometry(0.7, 0); break;
         }
         const MAX_INSTANCES = 90 * 90 * 90; // Biztonsági limit
         mesh = new THREE.InstancedMesh(geometry, material, MAX_INSTANCES);
