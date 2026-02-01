@@ -199,6 +199,7 @@
 
         input[type=range] {
             -webkit-appearance: none;
+            appearance: none;
             width: 100%;
             background: transparent;
             margin: 0;
@@ -285,9 +286,28 @@
         .btn-delete { background: var(--danger); }
         .btn-image { background: #0ea5e9; margin-top: auto; }
         
-        .record-btn { background: var(--danger); display: flex; justify-content: center; align-items: center; gap: 8px; }
-        .record-btn.recording { background: #f1f5f9; color: var(--danger); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        /* --- EXPORT BUTTONS --- */
+        .export-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        button.export-btn {
+            flex: 1;
+            background: var(--bg-secondary);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            padding: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        button.export-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
 
 
         /* --- CANVAS --- */
@@ -435,29 +455,6 @@
                 </div>
             </div>
 
-            <h3>Post-Processing (FX)</h3>
-            <div class="control-group">
-                <label>Blur <span id="val-blur" class="value-display">0.0</span></label>
-                <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('fxBlur', -0.1)">-</button>
-                    <input type="range" id="fxBlur" min="0" max="5" step="0.1" value="0">
-                    <button class="step-btn" onclick="adjustValue('fxBlur', 0.1)">+</button>
-                </div>
-
-                <label style="margin-top:5px;">Contrast <span id="val-contrast" class="value-display">1.0</span></label>
-                <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('fxContrast', -0.05)">-</button>
-                    <input type="range" id="fxContrast" min="0.5" max="2.0" step="0.05" value="1.0">
-                    <button class="step-btn" onclick="adjustValue('fxContrast', 0.05)">+</button>
-                </div>
-
-                <label style="margin-top:5px;">Gamma <span id="val-gamma" class="value-display">1.0</span></label>
-                <div class="input-row">
-                    <button class="step-btn" onclick="adjustValue('fxGamma', -0.05)">-</button>
-                    <input type="range" id="fxGamma" min="0.5" max="2.0" step="0.05" value="1.0">
-                    <button class="step-btn" onclick="adjustValue('fxGamma', 0.05)">+</button>
-                </div>
-            </div>
 
             <!-- MOVED FROM RIGHT SIDEBAR -->
             <h2>Colors & Operations</h2>
@@ -489,7 +486,7 @@
                     </div>
                     <div class="input-row">
                         <button class="step-btn" onclick="adjustValue('colorR', -1)">-</button>
-                        <input type="range" id="colorR" min="0" max="255" value="100" step="1">
+                        <input type="range" id="colorR" min="0" max="255" value="100" step="0.1">
                         <button class="step-btn" onclick="adjustValue('colorR', 1)">+</button>
                     </div>
                 </div>
@@ -506,7 +503,7 @@
                     </div>
                     <div class="input-row">
                         <button class="step-btn" onclick="adjustValue('colorG', -1)">-</button>
-                        <input type="range" id="colorG" min="0" max="255" value="150" step="1">
+                        <input type="range" id="colorG" min="0" max="255" value="150" step="0.1">
                         <button class="step-btn" onclick="adjustValue('colorG', 1)">+</button>
                     </div>
                 </div>
@@ -523,7 +520,7 @@
                     </div>
                     <div class="input-row">
                         <button class="step-btn" onclick="adjustValue('colorB', -1)">-</button>
-                        <input type="range" id="colorB" min="0" max="255" value="200" step="1">
+                        <input type="range" id="colorB" min="0" max="255" value="200" step="0.1">
                         <button class="step-btn" onclick="adjustValue('colorB', 1)">+</button>
                     </div>
                 </div>
@@ -560,6 +557,30 @@
                 <div class="color-preview" id="bgPreview" style="height: 20px;"></div>
             </div>
 
+            <h3>Post-Processing (FX)</h3>
+            <div class="control-group">
+                <label>Blur <span id="val-blur" class="value-display">0.0</span></label>
+                <div class="input-row">
+                    <button class="step-btn" onclick="adjustValue('fxBlur', -0.1)">-</button>
+                    <input type="range" id="fxBlur" min="0" max="5" step="0.1" value="0">
+                    <button class="step-btn" onclick="adjustValue('fxBlur', 0.1)">+</button>
+                </div>
+
+                <label style="margin-top:5px;">Contrast <span id="val-contrast" class="value-display">1.0</span></label>
+                <div class="input-row">
+                    <button class="step-btn" onclick="adjustValue('fxContrast', -0.05)">-</button>
+                    <input type="range" id="fxContrast" min="0.5" max="2.0" step="0.05" value="1.0">
+                    <button class="step-btn" onclick="adjustValue('fxContrast', 0.05)">+</button>
+                </div>
+
+                <label style="margin-top:5px;">Gamma <span id="val-gamma" class="value-display">1.0</span></label>
+                <div class="input-row">
+                    <button class="step-btn" onclick="adjustValue('fxGamma', -0.05)">-</button>
+                    <input type="range" id="fxGamma" min="0.5" max="2.0" step="0.05" value="1.0">
+                    <button class="step-btn" onclick="adjustValue('fxGamma', 0.05)">+</button>
+                </div>
+            </div>
+
             <h3>System</h3>
             <div class="control-group">
                 <button class="sys-btn btn-random" id="btnRandom">🎲 RANDOMIZE</button>
@@ -575,10 +596,12 @@
                 </div>
                 
                 <div class="sub-group">
-                    <label>Video Recording (Auto Loop)</label>
-                    <button class="sys-btn record-btn" id="btnRecord"><span>●</span> Start Recording</button>
+                    <label>Export Image</label>
+                    <div class="export-row">
+                        <button class="export-btn" onclick="downloadImage('png')">PNG</button>
+                        <button class="export-btn" onclick="downloadImage('jpg')">JPG</button>
+                    </div>
                 </div>
-                <button class="sys-btn btn-image" id="saveImgBtn">Save Image (PNG)</button>
             </div>
         </div>
 
@@ -586,7 +609,6 @@
         <div class="main-content">
             <canvas id="canvas" width="797" height="797"></canvas>
             <div id="watermark">neondreamslab.com</div>
-            <div id="recStatus">● RECORDING...</div>
         </div>
     </div>
 
@@ -657,9 +679,6 @@
         let animState = { R: { active: true, dir: 1 }, G: { active: true, dir: 1 }, B: { active: true, dir: 1 } };
 
 
-        let isLoopRecording = false;
-        let loopStartParams = null;
-        let loopFrameCount = 0;
 
         const ui = {
             wave: document.getElementById('waveCount'), 
@@ -942,73 +961,29 @@
             
             draw();
 
-            if (isLoopRecording) {
-                loopFrameCount++;
-                if (loopFrameCount > 60) {
-                    let allMatch = true;
-                    const tolerance = parseFloat(ui.speed.value) * 1.5; 
-                    if (loopStartParams.R) { const diff = Math.abs(parseFloat(ui.r.value) - loopStartParams.R.val); if (diff > tolerance || animState.R.dir !== loopStartParams.R.dir) allMatch = false; }
-                    if (loopStartParams.G) { const diff = Math.abs(parseFloat(ui.g.value) - loopStartParams.G.val); if (diff > tolerance || animState.G.dir !== loopStartParams.G.dir) allMatch = false; }
-                    if (loopStartParams.B) { const diff = Math.abs(parseFloat(ui.b.value) - loopStartParams.B.val); if (diff > tolerance || animState.B.dir !== loopStartParams.B.dir) allMatch = false; }
-                    if (allMatch) stopRecording();
-                }
-            }
 
             requestAnimationFrame(animateLoop);
         }
         
-        let mediaRecorder; let recordedChunks = [];
-        const btnRecord = document.getElementById('btnRecord'); const recStatus = document.getElementById('recStatus');
-        
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop(); isLoopRecording = false; btnRecord.innerHTML = "<span>●</span> Start Recording"; btnRecord.classList.remove('recording'); recStatus.style.display = 'none';
-            }
-        }
-
-        btnRecord.addEventListener('click', () => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') { stopRecording(); } 
-            else {
-                const stream = canvas.captureStream(60);
-                const types = [{ mime: 'video/mp4;codecs=avc1.4d002a', ext: 'mp4', bitrate: 15000000 }, { mime: 'video/mp4', ext: 'mp4', bitrate: 15000000 }, { mime: 'video/webm;codecs=vp9', ext: 'webm', bitrate: 15000000 }, { mime: 'video/webm', ext: 'webm', bitrate: 15000000 }];
-                let selectedType = null; for (const t of types) { if (MediaRecorder.isTypeSupported(t.mime)) { selectedType = t; break; } }
-                if (!selectedType) { alert("Format not supported."); return; }
-                try { mediaRecorder = new MediaRecorder(stream, { mimeType: selectedType.mime, videoBitsPerSecond: selectedType.bitrate }); } 
-                catch (e) { mediaRecorder = new MediaRecorder(stream); selectedType = { ext: 'webm' }; }
-                recordedChunks = []; mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(recordedChunks, { type: selectedType.mime || 'video/webm' }); const url = URL.createObjectURL(blob);
-                    const now = new Date(); const pad = (n) => n.toString().padStart(2, '0');
-                    const filename = `VID_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.${selectedType.ext}`;
-                    const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
-                };
-                isLoopRecording = true; loopFrameCount = 0;
-                loopStartParams = { R: animState.R.active ? { val: parseFloat(ui.r.value), dir: animState.R.dir } : null, G: animState.G.active ? { val: parseFloat(ui.g.value), dir: animState.G.dir } : null, B: animState.B.active ? { val: parseFloat(ui.b.value), dir: animState.B.dir } : null };
-                if (!loopStartParams.R && !loopStartParams.G && !loopStartParams.B) isLoopRecording = false;
-                mediaRecorder.start(); btnRecord.textContent = "■ Stop Recording"; btnRecord.classList.add('recording'); recStatus.textContent = `● RECORDING (${selectedType.ext.toUpperCase()})...`; recStatus.style.display = 'block';
-            }
-        });
-
-        ui.playBtn.addEventListener('click', () => { isPlaying = !isPlaying; if (isPlaying) { ui.playBtn.textContent = "■"; ui.playBtn.classList.add('playing'); animateLoop(); } else { ui.playBtn.textContent = "▶"; ui.playBtn.classList.remove('playing'); } });
-        function toggleAnim(channel, btnId) { animState[channel].active = !animState[channel].active; const btn = document.getElementById(btnId); if (animState[channel].active) btn.classList.add('active'); else btn.classList.remove('active'); }
-        document.getElementById('animR').addEventListener('click', () => toggleAnim('R', 'animR')); document.getElementById('animG').addEventListener('click', () => toggleAnim('G', 'animG')); document.getElementById('animB').addEventListener('click', () => toggleAnim('B', 'animB'));
-        function toggleDir(channel, btnId) { animState[channel].dir *= -1; const btn = document.getElementById(btnId); btn.textContent = animState[channel].dir === 1 ? "⬆" : "⬇"; }
-        document.getElementById('dirR').addEventListener('click', () => toggleDir('R', 'dirR')); document.getElementById('dirG').addEventListener('click', () => toggleDir('G', 'dirG')); document.getElementById('dirB').addEventListener('click', () => toggleDir('B', 'dirB'));
-        ui.blendMode.addEventListener('change', draw); ui.negateCheck.addEventListener('change', draw);
-        ui.bgR.addEventListener('input', () => requestAnimationFrame(draw)); ui.bgG.addEventListener('input', () => requestAnimationFrame(draw)); ui.bgB.addEventListener('input', () => requestAnimationFrame(draw));
-        ui.fxBlur.addEventListener('input', () => { if(!isPlaying) requestAnimationFrame(draw); }); ui.fxContrast.addEventListener('input', () => { if(!isPlaying) requestAnimationFrame(draw); }); ui.fxGamma.addEventListener('input', () => { if(!isPlaying) requestAnimationFrame(draw); });
-        
-        // SAVE IMAGE WITH WATERMARK
-        document.getElementById('saveImgBtn').addEventListener('click', () => { 
+        window.downloadImage = function(format) {
             const now = new Date(); 
             const pad = (n) => n.toString().padStart(2, '0'); 
-            const filename = `IMG_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.png`;
+            const ext = format === 'jpg' ? 'jpg' : 'png';
+            const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+            const filename = `IMG_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${ext}`;
             
             // Render watermark on temp canvas before saving
             const saveCanvas = document.createElement('canvas');
             saveCanvas.width = canvas.width;
             saveCanvas.height = canvas.height;
             const sCtx = saveCanvas.getContext('2d');
+            
+            // Fill background black for JPG (no alpha)
+            if (format === 'jpg') {
+                sCtx.fillStyle = '#000000';
+                sCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
+            }
+            
             sCtx.drawImage(canvas, 0, 0);
             
             sCtx.font = "bold 20px monospace";
@@ -1020,9 +995,18 @@
             
             const link = document.createElement('a'); 
             link.download = filename; 
-            link.href = saveCanvas.toDataURL('image/png'); 
+            link.href = saveCanvas.toDataURL(mime, 0.9); 
             link.click(); 
-        });
+        };
+
+        ui.playBtn.addEventListener('click', () => { isPlaying = !isPlaying; if (isPlaying) { ui.playBtn.textContent = "■"; ui.playBtn.classList.add('playing'); animateLoop(); } else { ui.playBtn.textContent = "▶"; ui.playBtn.classList.remove('playing'); } });
+        function toggleAnim(channel, btnId) { animState[channel].active = !animState[channel].active; const btn = document.getElementById(btnId); if (animState[channel].active) btn.classList.add('active'); else btn.classList.remove('active'); }
+        document.getElementById('animR').addEventListener('click', () => toggleAnim('R', 'animR')); document.getElementById('animG').addEventListener('click', () => toggleAnim('G', 'animG')); document.getElementById('animB').addEventListener('click', () => toggleAnim('B', 'animB'));
+        function toggleDir(channel, btnId) { animState[channel].dir *= -1; const btn = document.getElementById(btnId); btn.textContent = animState[channel].dir === 1 ? "⬆" : "⬇"; }
+        document.getElementById('dirR').addEventListener('click', () => toggleDir('R', 'dirR')); document.getElementById('dirG').addEventListener('click', () => toggleDir('G', 'dirG')); document.getElementById('dirB').addEventListener('click', () => toggleDir('B', 'dirB'));
+        ui.blendMode.addEventListener('change', draw); ui.negateCheck.addEventListener('change', draw);
+        ui.bgR.addEventListener('input', () => requestAnimationFrame(draw)); ui.bgG.addEventListener('input', () => requestAnimationFrame(draw)); ui.bgB.addEventListener('input', () => requestAnimationFrame(draw));
+        ui.fxBlur.addEventListener('input', () => { if(!isPlaying) requestAnimationFrame(draw); }); ui.fxContrast.addEventListener('input', () => { if(!isPlaying) requestAnimationFrame(draw); }); ui.fxGamma.addEventListener('input', () => { if(!isPlaying) requestAnimationFrame(draw); });
 
         document.querySelectorAll('input[type=range]').forEach(input => { input.addEventListener('input', () => { if (!isPlaying) requestAnimationFrame(draw); }); });
         
