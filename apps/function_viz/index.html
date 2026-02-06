@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ulam Spirál Vizualizáció (1M+ pont)</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #222;
+            color: #eee;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 10px; /* Reduced padding */
+            margin: 0;
+            min-height: 100vh;
+            box-sizing: border-box;
+            height: 100vh; /* Lock body height for full screen layout */
+            overflow: hidden; /* Prevent body scroll, handle in containers */
+        }
+        .controls {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: stretch;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            margin-right: 20px;
+            min-width: 200px;
+            max-width: 250px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-size: 0.85em;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+        input[type="number"] {
+            background: #444;
+            border: 1px solid #555;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .mode-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        .mode-selector label {
+            margin: 0;
+            cursor: pointer;
+            color: #eee;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95em;
+        }
+        .stats {
+            margin-left: 0;
+            font-weight: bold;
+            color: #fff;
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            border: 1px solid #444;
+        }
+        .canvas-container {
+            background-color: #000;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            overflow: hidden;
+            flex-grow: 1;
+            display: block; /* Remove flex centering to handle transform manually */
+            position: relative;
+            max-height: 100%;
+            border: 1px solid #444;
+            cursor: grab;
+        }
+        .canvas-container:active {
+            cursor: grabbing;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            transform-origin: 0 0;
+            /* Remove max constraints to allow full zoom/pan logic */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="startValue">Kezdőérték</label>
+            <input type="number" id="startValue" value="1" min="0" oninput="drawSpiral()">
+        </div>
+        <div class="control-group">
+            <label for="increment">Növekmény</label>
+            <input type="number" id="increment" value="1" min="1" oninput="drawSpiral()">
+        </div>
+        
+        <div class="mode-selector">
+            <label><input type="radio" name="ulamMode" value="prime" checked onchange="drawSpiral()"> Prím (Zöld)</label>
+            <label><input type="radio" name="ulamMode" value="square" onchange="drawSpiral()"> Négyzet (Kék)</label>
+            <label><input type="radio" name="ulamMode" value="cube" onchange="drawSpiral()"> Köb (Piros)</label>
+        </div>
+
+        <div class="stats">
+            Találatok: <span id="matchCount">0</span>
+        </div>
+
+        <div class="control-group" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 20px;">
+            <label>Automata Szabályok</label>
+            <select id="lifeRule" style="margin-bottom: 10px; width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #555; background: #444; color: white;">
+                <option value="life" selected>Game of Life (B3/S23)</option>
+                <option value="highlife">HighLife (B36/S23)</option>
+                <option value="daynight">Day & Night (B3678/S34678)</option>
+                <option value="seeds">Seeds (B2/S)</option>
+                <option value="diamoeba">Diamoeba (B35678/S5678)</option>
+                <option value="morley">Morley (B368/S245)</option>
+            </select>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="startLife()" style="background: #28a745; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; flex: 1;">Start</button>
+                <button onclick="stopLife()" style="background: #dc3545; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; flex: 1;">Stop</button>
+                <button onclick="resetLife()" style="background: #007bff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; flex: 1;">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <!-- 1001 x 1001 canvas -->
+        <canvas id="ulamCanvas" width="1001" height="1001"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('ulamCanvas');
+        const ctx = canvas.getContext('2d');
+        const countSpan = document.getElementById('matchCount');
+
+        const GRID_SIZE = 1001;
+        const TOTAL_ITEMS = GRID_SIZE * GRID_SIZE; // 1,002,001
+
+        function isPrime(num) {
+            if (num <= 1) return false;
+            if (num <= 3) return true;
+            if (num % 2 === 0 || num % 3 === 0) return false;
+            let i = 5;
+            while (i * i <= num) {
+                if (num % i === 0 || num % (i + 2) === 0) return false;
+                i += 6;
+            }
+            return true;
+        }
+
+        function isSquare(num) {
+            if (num < 0) return false;
+            const sqrt = Math.sqrt(num);
+            return Math.round(sqrt) ** 2 === num;
+        }
+
+        function isCube(num) {
+            if (num === 0) return true;
+            const cbrt = Math.cbrt(num);
+            const rounded = Math.round(cbrt);
+            return rounded ** 3 === num;
+        }
+
+        // Debounce draw to prevent freezing while typing
+        let timeoutId;
+        function drawSpiral() {
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(render, 50); // 50ms delay
+        }
+
+        function render() {
+            const startVal = parseInt(document.getElementById('startValue').value) || 0;
+            const incr = parseInt(document.getElementById('increment').value) || 1;
+            const mode = document.querySelector('input[name="ulamMode"]:checked').value;
+
+            // Prepare Pixel Buffer
+            const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE);
+            const data = imgData.data; // RGBA array
+
+            // Center
+            const cx = Math.floor(GRID_SIZE / 2); // 500
+            const cy = Math.floor(GRID_SIZE / 2); // 500
+
+            // Variables for Spiral Walk
+            let x = 0;
+            let y = 0;
+            let dx = 1; 
+            let dy = 0;
+            let segmentLength = 1;
+            let segmentPassed = 0;
+            let turnCount = 0;
+
+            let matches = 0;
+
+            // Set Color based on mode
+            let r=0, g=0, b=0;
+            if (mode === 'prime') { g = 255; }
+            else if (mode === 'square') { b = 255; }
+            else if (mode === 'cube') { r = 255; }
+
+            // Loop
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                const val = startVal + (i * incr);
+                
+                let isMatch = false;
+                if (mode === 'prime') isMatch = isPrime(val);
+                else if (mode === 'square') isMatch = isSquare(val);
+                else if (mode === 'cube') isMatch = isCube(val);
+
+                if (isMatch) {
+                    matches++;
+                    
+                    // Convert relative x,y to canvas coordinates
+                    // Canvas X = cx + x
+                    // Canvas Y = cy - y (inverted Y)
+                    const canvasX = cx + x;
+                    const canvasY = cy - y;
+
+                    // Set Pixel
+                    const index = (canvasY * GRID_SIZE + canvasX) * 4;
+                    data[index] = r;     // R
+                    data[index + 1] = g; // G
+                    data[index + 2] = b; // B
+                    data[index + 3] = 255; // Alpha
+                } else {
+                    // Optional: Set background color explicitly if needed, but ImageData is transparent/black by default?
+                    // createImageData initializes to transparent black (0,0,0,0).
+                    // If we want black background, we should fill or set alpha to 255 with 0 color.
+                    // For performance, let's just leave it transparent (canvas background is black via CSS) or set it.
+                    // CSS sets background black. Transparent pixels will show black. 
+                    // This is faster than setting every pixel to 0,0,0,255.
+                    // HOWEVER, createImageData returns Transparent Transparent Transparent Transparent.
+                    // So we rely on CSS background.
+                }
+
+                // Move
+                if (i < TOTAL_ITEMS - 1) {
+                    x += dx;
+                    y += dy;
+                    segmentPassed++;
+
+                    if (segmentPassed === segmentLength) {
+                        segmentPassed = 0;
+                        const tempDx = dx;
+                        dx = -dy;
+                        dy = tempDx;
+                        turnCount++;
+                        if (turnCount % 2 === 0) segmentLength++;
+                    }
+                }
+            }
+
+            // Put image data
+            ctx.putImageData(imgData, 0, 0);
+
+            // Draw Center Pixel (White)
+            ctx.fillStyle = 'white';
+            ctx.fillRect(cx, cy, 1, 1);
+            
+            // Update stats
+            countSpan.textContent = matches.toLocaleString();
+        }
+
+        // Zoom and Pan Logic
+        const container = document.querySelector('.canvas-container');
+        let scale = 1;
+        let panning = false;
+        let startX = 0, startY = 0;
+        let translateX = 0, translateY = 0;
+
+        // Initialize centering
+        function fitToScreen() {
+            const cRect = container.getBoundingClientRect();
+            // Initial scale to fit
+            const scaleX = (cRect.width - 20) / GRID_SIZE; // -20 margin
+            const scaleY = (cRect.height - 20) / GRID_SIZE;
+            scale = Math.min(scaleX, scaleY, 1); // Max 1 initially? Or fit? Let's fit.
+            if (scale < 0.1) scale = 0.1;
+
+            // Center
+            translateX = (cRect.width - GRID_SIZE * scale) / 2;
+            translateY = (cRect.height - GRID_SIZE * scale) / 2;
+            
+            applyTransform();
+        }
+
+        // Wait for layout
+        setTimeout(fitToScreen, 100);
+        window.addEventListener('resize', fitToScreen);
+
+        function applyTransform() {
+            canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        }
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const zoomIntensity = 0.1;
+            const wheel = e.deltaY < 0 ? 1 : -1;
+            const zoomFactor = Math.exp(wheel * zoomIntensity);
+
+            const nextScale = scale * zoomFactor;
+
+            // Calculate new translate to keep mouse point stationary
+            // mouse = translate + point * scale
+            // point = (mouse - translate) / scale
+            // newTranslate = mouse - point * newScale
+            //              = mouse - (mouse - translate) / scale * newScale
+            //              = mouse - (mouse - translate) * (newScale / scale)
+            
+            translateX = mouseX - (mouseX - translateX) * zoomFactor;
+            translateY = mouseY - (mouseY - translateY) * zoomFactor;
+            scale = nextScale;
+
+            applyTransform();
+        });
+
+        container.addEventListener('mousedown', (e) => {
+            panning = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!panning) return;
+            e.preventDefault();
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            applyTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            panning = false;
+        });
+
+        // Game of Life Logic
+        let lifeInterval = null;
+        let lifeGrid = new Uint8Array(TOTAL_ITEMS);
+        let nextGrid = new Uint8Array(TOTAL_ITEMS);
+
+        const LIFE_RULES = {
+            life:     { b: 1<<3, s: (1<<2)|(1<<3) },
+            highlife: { b: (1<<3)|(1<<6), s: (1<<2)|(1<<3) },
+            daynight: { b: (1<<3)|(1<<6)|(1<<7)|(1<<8), s: (1<<3)|(1<<4)|(1<<6)|(1<<7)|(1<<8) },
+            seeds:    { b: 1<<2, s: 0 },
+            diamoeba: { b: (1<<3)|(1<<5)|(1<<6)|(1<<7)|(1<<8), s: (1<<5)|(1<<6)|(1<<7)|(1<<8) },
+            morley:   { b: (1<<3)|(1<<6)|(1<<8), s: (1<<2)|(1<<4)|(1<<5) }
+        };
+
+        function startLife() {
+            if (lifeInterval) return;
+
+            // Initialize Grid from current parameters
+            const startVal = parseInt(document.getElementById('startValue').value) || 0;
+            const incr = parseInt(document.getElementById('increment').value) || 1;
+            const mode = document.querySelector('input[name="ulamMode"]:checked').value;
+            
+            // Re-calculate the current pattern into lifeGrid
+            // Same logic as render() loop
+            // Variables for Spiral Walk
+            let x = 0, y = 0, dx = 1, dy = 0;
+            let segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            const cx = Math.floor(GRID_SIZE / 2);
+            const cy = Math.floor(GRID_SIZE / 2);
+
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                const val = startVal + (i * incr);
+                let isMatch = false;
+                if (mode === 'prime') isMatch = isPrime(val);
+                else if (mode === 'square') isMatch = isSquare(val);
+                else if (mode === 'cube') isMatch = isCube(val);
+
+                // Map to 1D index
+                const canvasX = cx + x;
+                const canvasY = cy - y;
+                const idx = canvasY * GRID_SIZE + canvasX;
+                
+                lifeGrid[idx] = isMatch ? 1 : 0;
+
+                // Move
+                if (i < TOTAL_ITEMS - 1) {
+                    x += dx; y += dy; segmentPassed++;
+                    if (segmentPassed === segmentLength) {
+                        segmentPassed = 0;
+                        const tempDx = dx; dx = -dy; dy = tempDx;
+                        turnCount++;
+                        if (turnCount % 2 === 0) segmentLength++;
+                    }
+                }
+            }
+
+            lifeInterval = setInterval(stepLife, 100);
+        }
+
+        function stopLife() {
+            if (lifeInterval) {
+                clearInterval(lifeInterval);
+                lifeInterval = null;
+            }
+        }
+
+        function resetLife() {
+            stopLife();
+            render();
+        }
+
+        function stepLife() {
+            // Get Current Rule
+            const ruleKey = document.getElementById('lifeRule').value;
+            const rule = LIFE_RULES[ruleKey] || LIFE_RULES.life;
+            const bMask = rule.b;
+            const sMask = rule.s;
+
+            // Compute Next Generation
+            // Clear nextGrid to handle dead borders and prevent flickering
+            nextGrid.fill(0);
+
+            // Optimized neighbor counting for 1D array
+            for (let y = 1; y < GRID_SIZE - 1; y++) {
+                let rowOffset = y * GRID_SIZE;
+                for (let x = 1; x < GRID_SIZE - 1; x++) {
+                    const idx = rowOffset + x;
+                    
+                    // Count neighbors
+                    // Top Row
+                    let neighbors = lifeGrid[idx - GRID_SIZE - 1] + 
+                                    lifeGrid[idx - GRID_SIZE] + 
+                                    lifeGrid[idx - GRID_SIZE + 1] +
+                    // Middle Row
+                                    lifeGrid[idx - 1] + 
+                                    lifeGrid[idx + 1] +
+                    // Bottom Row
+                                    lifeGrid[idx + GRID_SIZE - 1] + 
+                                    lifeGrid[idx + GRID_SIZE] + 
+                                    lifeGrid[idx + GRID_SIZE + 1];
+
+                    const cell = lifeGrid[idx];
+                    const nBit = 1 << neighbors;
+
+                    if (cell === 1) {
+                        nextGrid[idx] = (sMask & nBit) ? 1 : 0;
+                    } else {
+                        nextGrid[idx] = (bMask & nBit) ? 1 : 0;
+                    }
+                }
+            }
+
+            // Swap grids
+            const temp = lifeGrid;
+            lifeGrid = nextGrid;
+            nextGrid = temp; // Reuse buffer
+
+            // Draw
+            const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE);
+            const data = imgData.data;
+
+            // Determine color based on current mode
+            const mode = document.querySelector('input[name="ulamMode"]:checked').value;
+            let r=0, g=0, b=0;
+            if (mode === 'prime') { g = 255; }
+            else if (mode === 'square') { b = 255; }
+            else if (mode === 'cube') { r = 255; }
+
+            let liveCount = 0;
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                if (lifeGrid[i] === 1) {
+                    const idx = i * 4;
+                    data[idx] = r;
+                    data[idx+1] = g;
+                    data[idx+2] = b;
+                    data[idx+3] = 255;
+                    liveCount++;
+                }
+            }
+            
+            ctx.putImageData(imgData, 0, 0);
+            
+            // Draw Center Pixel (White) - Keep it visible?
+            const cx = Math.floor(GRID_SIZE / 2);
+            const cy = Math.floor(GRID_SIZE / 2);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(cx, cy, 1, 1);
+
+            countSpan.textContent = liveCount.toLocaleString();
+        }
+
+        // Initial draw
+        render();
+    </script>
+</body>
+</html>
