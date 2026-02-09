@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prímhullám Szita Vizualizáció</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 10px; }
+        
+        .description {
+            max-width: 800px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #a0a0c0;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #16213e;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #0f3460;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+            margin: 0 5px;
+        }
+
+        button:hover { background-color: #e94560; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 15px; height: 15px; border-radius: 3px; }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 5px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .cell {
+            background-color: #eee; /* Ez az 1-es bit */
+            color: #333;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: transform 0.2s, background-color 0.3s;
+            position: relative;
+        }
+
+        /* Állapotok */
+        .cell.prime {
+            background-color: #2ecc71; /* Zöld - Megtalált prím */
+            color: white;
+            border: 2px solid #27ae60;
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        .cell.composite {
+            background-color: #e74c3c; /* Piros - Nullázott bit */
+            color: white;
+            opacity: 0.6;
+        }
+
+        /* A hullám animációja */
+        .cell.scanning {
+            background-color: #f1c40f; /* Sárga - Épp vizsgáljuk */
+            transform: scale(1.2);
+            z-index: 20;
+            box-shadow: 0 0 10px #f1c40f;
+        }
+
+        .cell.hidden {
+            visibility: hidden; /* 0 és 1 elrejtése opcionálisan */
+        }
+        
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #f1c40f;
+            height: 30px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Prímszám Hullám-Szita</h1>
+    <div class="description">
+        Ez a program a te "bit-szita" ötletedet modellezi. <br>
+        Minden szám egy "bit". Ha zöld lesz, az a következő hullámforrás (Prím).<br>
+        A hullám (sárga) végigfut, és "kiüti" (pirosra állítja) a többszörösöket.
+    </div>
+
+    <div class="controls">
+        <button id="btnNext" onclick="nextWave()">Következő Hullám indítása</button>
+        <button id="btnReset" onclick="resetGrid()">Újrakezdés</button>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="dot" style="background:#eee"></div> 1-es Bit (Még ismeretlen)</div>
+        <div class="legend-item"><div class="dot" style="background:#2ecc71"></div> Prím (Forrás)</div>
+        <div class="legend-item"><div class="dot" style="background:#e74c3c"></div> 0-s Bit (Összetett)</div>
+        <div class="legend-item"><div class="dot" style="background:#f1c40f"></div> Hullámfront</div>
+    </div>
+
+    <div id="status">Indítsd el a keresést!</div>
+    <div id="grid"></div>
+
+    <script>
+        const MAX_NUMBER = 100; // Eddig keresünk
+        const grid = document.getElementById('grid');
+        const statusDiv = document.getElementById('status');
+        let numbers = []; // Ez a bit-tömbünk (true = 1, false = 0)
+        let currentPrime = 2; // Innen indulunk
+        let isAnimating = false;
+
+        // Rács inicializálása
+        function initGrid() {
+            grid.innerHTML = '';
+            numbers = new Array(MAX_NUMBER + 1).fill(true); // Mindenki 1-es (potenciális prím)
+            numbers[0] = false;
+            numbers[1] = false;
+
+            for (let i = 1; i <= MAX_NUMBER; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.id = 'cell-' + i;
+                cell.textContent = i;
+                if (i === 1) cell.style.opacity = '0.3'; // 1-es szürke
+                grid.appendChild(cell);
+            }
+        }
+
+        function resetGrid() {
+            if(isAnimating) return;
+            currentPrime = 2;
+            initGrid();
+            statusDiv.textContent = "Rács alaphelyzetbe állítva.";
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('btnNext').textContent = "Keresés indítása";
+        }
+
+        function highlightCell(id, type) {
+            const cell = document.getElementById('cell-' + id);
+            if (type === 'prime') {
+                cell.className = 'cell prime';
+            } else if (type === 'composite') {
+                // Ha már volt composite, maradjon az, de villan egyet
+                if(!cell.classList.contains('composite')) {
+                    cell.className = 'cell composite';
+                }
+            } else if (type === 'scan') {
+                cell.classList.add('scanning');
+            } else if (type === 'unscan') {
+                cell.classList.remove('scanning');
+            }
+        }
+
+        async function nextWave() {
+            if (isAnimating) return;
+            isAnimating = true;
+            document.getElementById('btnNext').disabled = true;
+
+            // 1. Megkeressük a következő 1-es bitet (Prímet)
+            let foundNext = false;
+            
+            // Ha már túlmentünk a gyökön, a maradék mind prím
+            if (currentPrime * currentPrime > MAX_NUMBER) {
+                // Csak színezzük ki a maradékot gyorsan
+                for(let i = currentPrime; i <= MAX_NUMBER; i++) {
+                    if(numbers[i]) highlightCell(i, 'prime');
+                }
+                statusDiv.textContent = "Kész! Az összes prím megtalálva.";
+                isAnimating = false;
+                return;
+            }
+
+            // Keressük a következő aktív bitet
+            while (currentPrime <= MAX_NUMBER && !numbers[currentPrime]) {
+                currentPrime++;
+            }
+
+            if (currentPrime > MAX_NUMBER) {
+                statusDiv.textContent = "Kész!";
+                return;
+            }
+
+            // Ez egy prím!
+            highlightCell(currentPrime, 'prime');
+            statusDiv.textContent = `${currentPrime}-es hullám indítása... (Minden ${currentPrime}. bit nullázása)`;
+
+            // Várjunk picit, hogy a felhasználó lássa a prímet
+            await new Promise(r => setTimeout(r, 500));
+
+            // 2. Elindítjuk a HULLÁMOT (animáció)
+            // A te ötleted szerint: a hullámhossz = currentPrime
+            // Optimalizáció: kezdhetnénk currentPrime^2-től, de a hullám effekt miatt 
+            // most currentPrime * 2-től indítjuk, hogy látszódjon az ugrálás.
+            
+            for (let i = currentPrime * 2; i <= MAX_NUMBER; i += currentPrime) {
+                // Hullámfront mozgatása
+                highlightCell(i, 'scan');
+                await new Promise(r => setTimeout(r, 100)); // Animációs sebesség
+                highlightCell(i, 'unscan');
+
+                // Bit átbillentése 0-ra (Piros)
+                numbers[i] = false;
+                highlightCell(i, 'composite');
+            }
+
+            currentPrime++;
+            isAnimating = false;
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('btnNext').textContent = "Következő Hullám";
+        }
+
+        // Indításkor
+        initGrid();
+
+    </script>
+</body>
+</html>
