@@ -207,13 +207,10 @@
         </div>
 
         <div class="controls">
-            <!-- Range Config -->
+            <!-- Grid Size Slider -->
             <div class="control-group">
-                <label for="maxInput">Max Number (Range):</label>
-                <div class="control-row">
-                    <input type="number" id="maxInput" value="100" min="10" max="1000" step="2">
-                    <button class="secondary" onclick="updateSettings()" style="width: auto; padding: 8px 15px;">Set</button>
-                </div>
+                <label for="sizeSlider">Grid Size: <span id="sizeLabel" style="color: #2ecc71; font-weight: bold;">10x10 (100)</span></label>
+                <input type="range" id="sizeSlider" min="10" max="20" step="1" value="10" style="width: 100%; cursor: pointer;">
             </div>
 
             <!-- Sound Toggle -->
@@ -248,9 +245,11 @@
 
     <script>
         let MAX_NUMBER = 100;
+        let GRID_SIZE = 10;
         const grid = document.getElementById('grid');
         const statusDiv = document.getElementById('status');
-        const maxInput = document.getElementById('maxInput');
+        const sizeSlider = document.getElementById('sizeSlider');
+        const sizeLabel = document.getElementById('sizeLabel');
         const soundToggle = document.getElementById('soundToggle');
         
         let numbers = []; 
@@ -298,15 +297,22 @@
             }
         }
 
-        // Settings
-        function updateSettings() {
-            if(isAnimating) return;
-            let val = parseInt(maxInput.value);
-            if (val < 10) val = 10;
-            if (val > 10000) val = 10000; // Cap at 10k for performance
-            MAX_NUMBER = val;
-            resetGrid();
-        }
+        // Slider Event Listener
+        sizeSlider.oninput = function() {
+            GRID_SIZE = parseInt(this.value);
+            MAX_NUMBER = GRID_SIZE * GRID_SIZE;
+            sizeLabel.textContent = `${GRID_SIZE}x${GRID_SIZE} (${MAX_NUMBER})`;
+            
+            // Stop any running animation
+            isAnimating = false;
+            stopAutoPlay();
+            currentPrime = 2;
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('btnNext').textContent = "Start Search";
+            statusDiv.textContent = "Grid resized.";
+            
+            initGrid();
+        };
 
         // Grid initialization
         function initGrid() {
@@ -315,12 +321,9 @@
             numbers[0] = false;
             numbers[1] = false;
 
-            // Calculate columns: Sqrt approx, but ensure EVEN number
-            let cols = Math.ceil(Math.sqrt(MAX_NUMBER));
-            if (cols % 2 !== 0) cols++; // Force even
-            // Ensure meaningful width
-            if (cols < 2) cols = 2; 
-
+            // Columns equals the grid size (Square grid)
+            let cols = GRID_SIZE;
+            
             grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
             grid.style.gridAutoRows = '1fr'; // Fill height
 
