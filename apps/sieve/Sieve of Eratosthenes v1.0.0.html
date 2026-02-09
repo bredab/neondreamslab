@@ -10,30 +10,59 @@
             background-color: #1a1a2e;
             color: #fff;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
+            flex-direction: row;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
         }
 
-        h1 { margin-bottom: 10px; }
+        .sidebar {
+            width: 320px;
+            background: #16213e;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            z-index: 10;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1a1a2e;
+            overflow: hidden;
+            position: relative;
+        }
+
+        h1 { 
+            margin: 0; 
+            font-size: 24px;
+            color: #fff;
+        }
         
         .description {
-            max-width: 800px;
-            text-align: center;
-            margin-bottom: 20px;
             color: #a0a0c0;
+            font-size: 14px;
+            line-height: 1.5;
         }
 
         .controls {
-            margin-bottom: 20px;
-            background: #16213e;
+            background: rgba(255,255,255,0.05);
             padding: 15px;
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         button {
-            padding: 10px 20px;
+            padding: 12px;
             font-size: 16px;
             cursor: pointer;
             background-color: #0f3460;
@@ -41,7 +70,7 @@
             border: none;
             border-radius: 5px;
             transition: background 0.3s;
-            margin: 0 5px;
+            width: 100%;
         }
 
         button:hover { background-color: #e94560; }
@@ -49,106 +78,113 @@
 
         .legend {
             display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
+            flex-direction: column;
+            gap: 10px;
             font-size: 14px;
         }
-        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-item { display: flex; align-items: center; gap: 10px; }
         .dot { width: 15px; height: 15px; border-radius: 3px; }
+
+        #status {
+            font-size: 16px;
+            font-weight: bold;
+            color: #f1c40f;
+            min-height: 40px;
+        }
 
         #grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
+            grid-auto-rows: 1fr;
             gap: 5px;
-            max-width: 800px;
             width: 100%;
+            height: 100%;
         }
 
         .cell {
-            background-color: #eee; /* Ez az 1-es bit */
+            background-color: #eee; /* This is bit 1 */
             color: #333;
-            height: 50px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 5px;
             font-weight: bold;
+            /* Dynamic font size based on viewport width */
+            font-size: clamp(12px, 2vw, 24px); 
             transition: transform 0.2s, background-color 0.3s;
             position: relative;
         }
 
-        /* Állapotok */
+        /* States */
         .cell.prime {
-            background-color: #2ecc71; /* Zöld - Megtalált prím */
+            background-color: #2ecc71; /* Green - Found prime */
             color: white;
             border: 2px solid #27ae60;
-            transform: scale(1.1);
+            transform: scale(1.05);
             z-index: 10;
         }
 
         .cell.composite {
-            background-color: #e74c3c; /* Piros - Nullázott bit */
+            background-color: #e74c3c; /* Red - Zeroed bit */
             color: white;
             opacity: 0.6;
         }
 
-        /* A hullám animációja */
+        /* Wave animation */
         .cell.scanning {
-            background-color: #f1c40f; /* Sárga - Épp vizsgáljuk */
-            transform: scale(1.2);
+            background-color: #f1c40f; /* Yellow - Currently scanning */
+            transform: scale(1.1);
             z-index: 20;
             box-shadow: 0 0 10px #f1c40f;
         }
 
         .cell.hidden {
-            visibility: hidden; /* 0 és 1 elrejtése opcionálisan */
+            visibility: hidden; /* Optionally hide 0 and 1 */
         }
         
-        #status {
-            margin-top: 20px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #f1c40f;
-            height: 30px;
-        }
-
     </style>
 </head>
 <body>
 
-    <h1>Sieve of Eratosthenes v1.0.0</h1>
-    <div class="description">
-        This program models your "bit-sieve" idea. <br>
-        Each number is a "bit". If it turns green, it is the next wave source (Prime).<br>
-        The wave (yellow) runs through and "knocks out" (sets to red) the multiples.
+    <div class="sidebar">
+        <h1>Sieve of Eratosthenes v1.0.0</h1>
+        
+        <div class="description">
+            This visualization demonstrates the Sieve of Eratosthenes. <br>
+            Green numbers are found primes. <br>
+            The algorithm proceeds by filtering out multiples (marking them red) for each new prime discovered.
+        </div>
+
+        <div class="controls">
+            <button id="btnNext" onclick="nextWave()">Start Search</button>
+            <button id="btnReset" onclick="resetGrid()">Restart</button>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:#eee"></div> Unknown</div>
+            <div class="legend-item"><div class="dot" style="background:#2ecc71"></div> Prime Number</div>
+            <div class="legend-item"><div class="dot" style="background:#e74c3c"></div> Composite Number</div>
+        </div>
+
+        <div id="status">Start the search!</div>
     </div>
 
-    <div class="controls">
-        <button id="btnNext" onclick="nextWave()">Start Search</button>
-        <button id="btnReset" onclick="resetGrid()">Restart</button>
+    <div class="main-content">
+        <div id="grid"></div>
     </div>
-
-    <div class="legend">
-        <div class="legend-item"><div class="dot" style="background:#eee"></div> Unknown</div>
-        <div class="legend-item"><div class="dot" style="background:#2ecc71"></div> Prime Number</div>
-        <div class="legend-item"><div class="dot" style="background:#e74c3c"></div> Composite Number</div>
-    </div>
-
-    <div id="status">Start the search!</div>
-    <div id="grid"></div>
 
     <script>
-        const MAX_NUMBER = 100; // Eddig keresünk
+        const MAX_NUMBER = 100; // Search up to here
         const grid = document.getElementById('grid');
         const statusDiv = document.getElementById('status');
-        let numbers = []; // Ez a bit-tömbünk (true = 1, false = 0)
-        let currentPrime = 2; // Innen indulunk
+        let numbers = []; // This is our bit array (true = 1, false = 0)
+        let currentPrime = 2; // Start from here
         let isAnimating = false;
 
-        // Rács inicializálása
+        // Grid initialization
         function initGrid() {
             grid.innerHTML = '';
-            numbers = new Array(MAX_NUMBER + 1).fill(true); // Mindenki 1-es (potenciális prím)
+            numbers = new Array(MAX_NUMBER + 1).fill(true); // Everyone is 1 (potential prime)
             numbers[0] = false;
             numbers[1] = false;
 
@@ -157,7 +193,7 @@
                 cell.classList.add('cell');
                 cell.id = 'cell-' + i;
                 cell.textContent = i;
-                if (i === 1) cell.style.opacity = '0.3'; // 1-es szürke
+                if (i === 1) cell.style.opacity = '0.3'; // 1 is gray
                 grid.appendChild(cell);
             }
         }
@@ -176,7 +212,7 @@
             if (type === 'prime') {
                 cell.className = 'cell prime';
             } else if (type === 'composite') {
-                // Ha már volt composite, maradjon az, de villan egyet
+                // If it was already composite, stay so, but flash once
                 if(!cell.classList.contains('composite')) {
                     cell.className = 'cell composite';
                 }
@@ -192,10 +228,10 @@
             isAnimating = true;
             document.getElementById('btnNext').disabled = true;
 
-            // 1. Megkeressük a következő 1-es bitet (Prímet)
+            // 1. Find the next 1 bit (Prime)
             let foundNext = false;
             
-            // Ha már túlmentünk a gyökön, a maradék mind prím
+            // If we passed the square root, the rest are all primes
             if (currentPrime * currentPrime > MAX_NUMBER) {
                 // Just color the rest quickly
                 for(let i = currentPrime; i <= MAX_NUMBER; i++) {
@@ -206,7 +242,7 @@
                 return;
             }
 
-            // Keressük a következő aktív bitet
+            // Find the next active bit
             while (currentPrime <= MAX_NUMBER && !numbers[currentPrime]) {
                 currentPrime++;
             }
@@ -218,23 +254,23 @@
 
             // This is a prime!
             highlightCell(currentPrime, 'prime');
-            statusDiv.textContent = `Starting wave ${currentPrime}... (Zeroing every ${currentPrime}. bit)`;
+            statusDiv.textContent = `Sieving multiples of ${currentPrime}... (Zeroing every ${currentPrime}. bit)`;
 
-            // Várjunk picit, hogy a felhasználó lássa a prímet
+            // Wait a bit so the user sees the prime
             await new Promise(r => setTimeout(r, 500));
 
-            // 2. Elindítjuk a HULLÁMOT (animáció)
-            // A te ötleted szerint: a hullámhossz = currentPrime
-            // Optimalizáció: kezdhetnénk currentPrime^2-től, de a hullám effekt miatt 
-            // most currentPrime * 2-től indítjuk, hogy látszódjon az ugrálás.
+            // 2. Start the WAVE (animation)
+            // According to your idea: wavelength = currentPrime
+            // Optimization: we could start from currentPrime^2, but due to the wave effect
+            // we start from currentPrime * 2 to show the jumping.
             
             for (let i = currentPrime * 2; i <= MAX_NUMBER; i += currentPrime) {
-                // Hullámfront mozgatása
+                // Move wave front
                 highlightCell(i, 'scan');
-                await new Promise(r => setTimeout(r, 100)); // Animációs sebesség
+                await new Promise(r => setTimeout(r, 100)); // Animation speed
                 highlightCell(i, 'unscan');
 
-                // Bit átbillentése 0-ra (Piros)
+                // Flip bit to 0 (Red)
                 numbers[i] = false;
                 highlightCell(i, 'composite');
             }
@@ -242,10 +278,10 @@
             currentPrime++;
             isAnimating = false;
             document.getElementById('btnNext').disabled = false;
-            document.getElementById('btnNext').textContent = "Next Wave";
+            document.getElementById('btnNext').textContent = "Filter Multiples";
         }
 
-        // Indításkor
+        // On startup
         initGrid();
 
     </script>
