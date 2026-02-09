@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ulam Laboratórium v2.3 (Fix)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #eee;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 10px;
+            margin: 0;
+            min-height: 100vh;
+            box-sizing: border-box;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .controls {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            margin-right: 20px;
+            min-width: 280px;
+            max-width: 300px;
+            border: 1px solid #444;
+            overflow-y: auto;
+            max-height: 98vh;
+        }
+        .control-group { display: flex; flex-direction: column; }
+        label { font-size: 0.75rem; margin-bottom: 4px; color: #bbb; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; }
+        input[type="number"], select { background: #3a3a3a; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; font-size: 0.9rem; }
+        input[type="number"]:focus, select:focus { outline: none; border-color: #007bff; }
+
+        .info-panel {
+            background: #222;
+            border: 1px solid #007bff;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #00ffaa;
+            height: 110px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 5px;
+        }
+        .info-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        .info-label { color: #888; }
+        .info-val { font-weight: bold; color: white; }
+        .info-big { font-size: 1.2rem; color: #ffcc00; text-align: center; margin-top: auto; padding-top: 5px; }
+
+        .mode-selector { display: flex; flex-direction: column; gap: 6px; background: #222; padding: 8px; border-radius: 6px; border: 1px solid #444; }
+        .mode-selector label { margin: 0; cursor: pointer; color: #ddd; font-weight: normal; display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 0.85rem; padding: 2px; }
+        .mode-selector label:hover { background: #333; }
+
+        .add-layer-group { display: flex; gap: 5px; align-items: center; }
+        input[type="color"] { background: none; border: none; width: 40px; height: 36px; cursor: pointer; padding: 0; }
+        .main-action-btn { background: #007bff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; flex-grow: 1; font-size: 0.8rem; text-transform: uppercase; }
+        .main-action-btn:hover { background: #0056b3; }
+        
+        .layer-list { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid #444; padding-top: 10px; min-height: 50px; }
+        .layer-item { background: #333; padding: 6px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid transparent; }
+        .layer-item.hidden-layer { opacity: 0.5; background: #252525; }
+        .layer-info { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; }
+        .layer-controls { display: flex; gap: 4px; }
+        .icon-btn { background: #444; border: 1px solid #555; color: #eee; width: 24px; height: 24px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+        .icon-btn:hover { background: #555; }
+        .btn-delete:hover { background: #602020; border-color: #ff4444; }
+
+        .canvas-container { background-color: #000; box-shadow: 0 0 40px rgba(0,0,0,0.8); overflow: hidden; flex-grow: 1; display: block; position: relative; height: 100%; border: 1px solid #333; cursor: crosshair; border-radius: 4px; }
+        canvas { display: block; image-rendering: pixelated; transform-origin: 0 0; }
+
+        .gol-section { margin-top: 10px; border-top: 1px solid #444; padding-top: 10px; background: #252525; padding: 10px; border-radius: 6px; }
+        .gol-controls { display: flex; gap: 5px; margin-top: 8px; }
+        .gol-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        
+        .secondary-btn { background: #555; color: white; border: none; padding: 8px; width: 100%; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        .secondary-btn:hover { background: #666; }
+        .delete-all-btn { background: #882222; }
+        .delete-all-btn:hover { background: #aa3333; }
+
+        .helper-text { font-size: 0.7rem; color: #888; margin-top: 5px; font-style: italic; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <label>Kurzor Info</label>
+        <div class="info-panel" id="statusPanel">
+            <div class="info-row"><span class="info-label">Pozíció:</span> <span class="info-val" id="infoPos">-</span></div>
+            <div class="info-row"><span class="info-label">Index:</span> <span class="info-val" id="infoIdx">-</span></div>
+            <div style="font-size:0.75rem; color:#888; margin-top:5px;">Számérték (Szekvencia):</div>
+            <div class="info-big" id="infoVal">-</div>
+        </div>
+
+        <div class="control-group">
+            <label for="startValue">Kezdőérték</label>
+            <input type="number" id="startValue" value="0" min="0" oninput="drawSpiral()">
+        </div>
+        <div class="control-group">
+            <label for="increment">Növekmény</label>
+            <input type="number" id="increment" value="1" min="1" oninput="drawSpiral()">
+        </div>
+        
+        <div class="mode-selector">
+            <label><input type="radio" name="ulamMode" value="prime" checked onchange="drawSpiral()"> Prím</label>
+            <label><input type="radio" name="ulamMode" value="square" onchange="drawSpiral()"> Négyzet</label>
+            <label><input type="radio" name="ulamMode" value="cube" onchange="drawSpiral()"> Köb</label>
+            <label><input type="radio" name="ulamMode" value="step" onchange="drawSpiral()"> Szekvencia</label>
+        </div>
+
+        <label style="margin-top:10px;">Új réteg hozzáadása / Szín</label>
+        <div class="add-layer-group">
+            <input type="color" id="layerColor" value="#ffff00" title="Válassz színt" oninput="onColorChange()">
+            <button class="main-action-btn" onclick="addLayer()">+ Hozzáadás</button>
+        </div>
+
+        <div class="layer-list" id="layerList"></div>
+        
+        <button class="secondary-btn delete-all-btn" onclick="deleteAllLayers()">Minden törlése</button>
+        <button class="secondary-btn" onclick="saveImage()">Kép mentése (PNG)</button>
+        
+        <div class="stats">Pixel db: <span id="matchCount">0</span></div>
+        <div class="helper-text">SHIFT + Klikk: Pixel invertálása</div>
+
+        <div class="gol-section">
+            <label>Életjáték Szabályok</label>
+            <select id="lifeRule">
+                <option value="life" selected>Game of Life (B3/S23)</option>
+                <option value="highlife">HighLife (B36/S23)</option>
+                <option value="daynight">Day & Night (B3678/S34678)</option>
+                <option value="seeds">Seeds (B2/S)</option>
+                <option value="diamoeba">Diamoeba (B35678/S5678)</option>
+                <option value="morley">Morley (B368/S245)</option>
+            </select>
+            <div class="gol-controls">
+                <button class="gol-btn" id="btnStart" onclick="toggleLife()" style="background: #28a745;">Start</button>
+                <button class="gol-btn" onclick="resetLife()" style="background: #17a2b8;">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="ulamCanvas" width="1001" height="1001"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('ulamCanvas');
+        const container = document.querySelector('.canvas-container');
+        const ctx = canvas.getContext('2d');
+        const countSpan = document.getElementById('matchCount');
+        const layerListDiv = document.getElementById('layerList');
+        const infoPos = document.getElementById('infoPos');
+        const infoIdx = document.getElementById('infoIdx');
+        const infoVal = document.getElementById('infoVal');
+        const btnStart = document.getElementById('btnStart');
+
+        const GRID_SIZE = 1001;
+        const TOTAL_ITEMS = GRID_SIZE * GRID_SIZE; 
+        const CX = Math.floor(GRID_SIZE / 2);
+        const CY = Math.floor(GRID_SIZE / 2);
+
+        let layers = []; 
+        let manualEdits = new Map(); 
+        let timeoutId;
+        let lifeInterval = null;
+        let isPaused = false;
+        let lifeGrid = new Uint8Array(TOTAL_ITEMS);
+        let nextGrid = new Uint8Array(TOTAL_ITEMS);
+        let scale = 1, translateX = 0, translateY = 0;
+        let panning = false, startX = 0, startY = 0;
+
+        // --- MATEMATIKA ---
+        function isPrime(num) {
+            if (num <= 1) return false;
+            if (num <= 3) return true;
+            if (num % 2 === 0 || num % 3 === 0) return false;
+            let i = 5;
+            while (i * i <= num) {
+                if (num % i === 0 || num % (i + 2) === 0) return false;
+                i += 6;
+            }
+            return true;
+        }
+        function isSquare(num) { if(num<0)return false; const s=Math.sqrt(num); return Math.round(s)**2===num; }
+        function isCube(num) { const c=Math.cbrt(num); return Math.round(c)**3===num; }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [255, 255, 255];
+        }
+
+        // --- JAVÍTOTT ULAM INDEX SZÁMÍTÁS ---
+        function getUlamIndex(gx, gy) {
+            let x = gx - CX;
+            let y = -(gy - CY); 
+            if (x === 0 && y === 0) return 0;
+            const k = Math.max(Math.abs(x), Math.abs(y)); 
+            
+            // Jobb oldal: x = k, y > -k
+            if (x === k && y > -k) return (2*k-1)**2 + (y + k - 1);
+            
+            // Felső oldal: y = k, x >= -k (JAVÍTVA: > helyett >=, hogy a bal-felső sarok (-k, k) ide tartozzon)
+            if (y === k && x >= -k) return ((2*k-1)**2) + (2*k - 1) + (k - x);
+            
+            // Bal oldal: x = -k, y < k
+            if (x === -k && y < k) return ((2*k-1)**2) + (4*k - 1) + (k - y);
+            
+            // Alsó oldal: y = -k, x > -k
+            if (y === -k && x > -k) return ((2*k-1)**2) + (6*k - 1) + (x + k);
+            
+            return 0;
+        }
+
+        function getCanvasCoordinates(e) {
+            const rect = container.getBoundingClientRect();
+            const clientX = e.clientX;
+            const clientY = e.clientY;
+            const mouseX = clientX - rect.left;
+            const mouseY = clientY - rect.top;
+            const rawX = (mouseX - translateX) / scale;
+            const rawY = (mouseY - translateY) / scale;
+            const x = Math.floor(rawX);
+            const y = Math.floor(rawY);
+            return { x, y, valid: x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE };
+        }
+
+        // --- UI ---
+        function getInputs() {
+            return {
+                start: parseInt(document.getElementById('startValue').value) || 0,
+                incr: parseInt(document.getElementById('increment').value) || 1,
+                mode: document.querySelector('input[name="ulamMode"]:checked').value,
+                color: document.getElementById('layerColor').value
+            };
+        }
+
+        function onColorChange() {
+            if (lifeInterval || isPaused) renderLifeFrame();
+            else drawSpiral();
+        }
+
+        function drawSpiral() {
+            if (lifeInterval || isPaused) return; 
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(render, 15);
+        }
+
+        function addLayer() {
+            const current = getInputs();
+            const rgb = hexToRgb(current.color);
+            layers.push({ ...current, visible: true, rgb: rgb });
+            updateLayerListUI();
+            drawSpiral();
+        }
+
+        function updateLayerListUI() {
+            layerListDiv.innerHTML = '';
+            layers.forEach((l, idx) => {
+                let label = l.mode === 'step' ? `Szekv.: ${l.start} + ${l.incr}n` :
+                            l.mode === 'prime' ? `Prím (${l.start})` :
+                            l.mode === 'square' ? `Négyzet (${l.start})` : `Köb (${l.start})`;
+                const div = document.createElement('div');
+                div.className = `layer-item ${l.visible ? '' : 'hidden-layer'}`;
+                div.style.borderLeftColor = l.color;
+                div.innerHTML = `
+                    <div class="layer-info" title="${label}"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${l.color};margin-right:8px;"></span><span>${label}</span></div>
+                    <div class="layer-controls"><button class="icon-btn" onclick="toggleLayerVis(${idx})">${l.visible?'👁️':'🚫'}</button><button class="icon-btn btn-delete" onclick="delLayer(${idx})">🗑️</button></div>`;
+                layerListDiv.appendChild(div);
+            });
+        }
+
+        function toggleLayerVis(i) { layers[i].visible = !layers[i].visible; drawSpiral(); updateLayerListUI(); }
+        function delLayer(i) { layers.splice(i, 1); drawSpiral(); updateLayerListUI(); }
+        function deleteAllLayers() { if (confirm("Biztosan törölsz mindent?")) { layers = []; manualEdits.clear(); resetLife(); updateLayerListUI(); } }
+        function saveImage() { const link = document.createElement('a'); link.download = 'ulam_spiral.png'; link.href = canvas.toDataURL(); link.click(); }
+
+        // --- ESEMÉNYKEZELÉS ---
+        let isDrawing = false;
+        container.addEventListener('mousedown', (e) => { if (e.shiftKey && e.button === 0) { isDrawing = true; handleEdit(e); } });
+        container.addEventListener('mousemove', (e) => { updateStatusPanel(e); if (isDrawing && e.shiftKey) handleEdit(e); });
+        container.addEventListener('mouseleave', () => resetStatusPanel());
+        
+        container.addEventListener('mousedown', (e) => { if (!e.shiftKey && e.button === 0) { panning = true; startX = e.clientX - translateX; startY = e.clientY - translateY; container.style.cursor = "grabbing"; } });
+        window.addEventListener('mouseup', () => { isDrawing = false; panning = false; container.style.cursor = "crosshair"; });
+        window.addEventListener('mousemove', (e) => { if (panning) { e.preventDefault(); translateX = e.clientX - startX; translateY = e.clientY - startY; applyTransform(); } });
+
+        function resetStatusPanel() { infoPos.textContent = "-"; infoIdx.textContent = "-"; infoVal.textContent = "-"; }
+        function updateStatusPanel(e) {
+            const pos = getCanvasCoordinates(e);
+            if (pos.valid) {
+                const relX = pos.x - CX; const relY = -(pos.y - CY); 
+                const ulamIdx = getUlamIndex(pos.x, pos.y);
+                const inputs = getInputs(); 
+                const val = inputs.start + (ulamIdx * inputs.incr);
+                infoPos.textContent = `X:${relX} Y:${relY}`; infoIdx.textContent = ulamIdx; infoVal.textContent = val.toLocaleString();
+            } else { resetStatusPanel(); }
+        }
+
+        function handleEdit(e) {
+            const pos = getCanvasCoordinates(e);
+            if (!pos.valid) return;
+            const idx = pos.y * GRID_SIZE + pos.x;
+            if (lifeInterval || isPaused) { lifeGrid[idx] = lifeGrid[idx] ? 0 : 1; if (isPaused) renderLifeFrame(); }
+            else { if (manualEdits.has(idx)) manualEdits.delete(idx); else manualEdits.set(idx, 1); render(); }
+        }
+
+        function render() {
+            const current = getInputs(); const currentRgb = hexToRgb(current.color);
+            const queue = []; layers.forEach(l => { if(l.visible) queue.push(l); }); queue.push({ ...current, isPreview: true, rgb: currentRgb });
+            const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
+            let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                const cx = CX + x; const cy = CY - y; const pixelIndex = (cy * GRID_SIZE + cx) * 4; const manualIdx = cy * GRID_SIZE + cx;
+                let r=0, g=0, b=0, a=0;
+                for (let l = 0; l < queue.length; l++) {
+                    const layer = queue[l]; let isMatch = false;
+                    if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isMatch = true; }
+                    else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime') isMatch = isPrime(val); else if (layer.mode === 'square') isMatch = isSquare(val); else if (layer.mode === 'cube') isMatch = isCube(val); }
+                    if (isMatch) { r = layer.rgb[0]; g = layer.rgb[1]; b = layer.rgb[2]; a = 255; }
+                }
+                if (manualEdits.has(manualIdx)) { if (a === 0) { r=255; g=255; b=255; a=255; } else { r=0; g=0; b=0; a=255; } }
+                if (a > 0) { data[pixelIndex] = r; data[pixelIndex+1] = g; data[pixelIndex+2] = b; data[pixelIndex+3] = a; }
+                if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
+            }
+            ctx.putImageData(imgData, 0, 0); ctx.fillStyle = 'white'; ctx.fillRect(CX, CY, 1, 1);
+        }
+
+        function toggleLife() { if (lifeInterval) pauseLife(); else if (isPaused) resumeLife(); else initLife(); }
+        function initLife() {
+            const current = getInputs(); const currentRgb = hexToRgb(current.color);
+            const queue = []; layers.forEach(l => { if(l.visible) queue.push(l); }); queue.push({ ...current, rgb: currentRgb });
+            lifeGrid.fill(0);
+            let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                let isAlive = 0;
+                for (let l = 0; l < queue.length; l++) {
+                    const layer = queue[l];
+                    if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isAlive = 1; }
+                    else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime' && isPrime(val)) isAlive = 1; else if (layer.mode === 'square' && isSquare(val)) isAlive = 1; else if (layer.mode === 'cube' && isCube(val)) isAlive = 1; }
+                    if (isAlive) break;
+                }
+                const idx = (CY - y) * GRID_SIZE + (CX + x); if (manualEdits.has(idx)) isAlive = isAlive ? 0 : 1; lifeGrid[idx] = isAlive;
+                if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
+            }
+            resumeLife();
+        }
+        function pauseLife() { clearInterval(lifeInterval); lifeInterval = null; isPaused = true; btnStart.textContent = "Folytatás"; btnStart.style.background = "#28a745"; }
+        function resumeLife() { isPaused = false; btnStart.textContent = "Szünet"; btnStart.style.background = "#ffc107"; btnStart.style.color = "#000"; lifeInterval = setInterval(stepLife, 100); }
+        function resetLife() { pauseLife(); isPaused = false; btnStart.textContent = "Start"; btnStart.style.background = "#28a745"; btnStart.style.color = "#fff"; render(); }
+
+        const LIFE_RULES = { life: { b: 1<<3, s: (1<<2)|(1<<3) }, highlife: { b: (1<<3)|(1<<6), s: (1<<2)|(1<<3) }, daynight: { b: (1<<3)|(1<<6)|(1<<7)|(1<<8), s: (1<<3)|(1<<4)|(1<<6)|(1<<7)|(1<<8) }, seeds: { b: 1<<2, s: 0 }, diamoeba: { b: (1<<3)|(1<<5)|(1<<6)|(1<<7)|(1<<8), s: (1<<5)|(1<<6)|(1<<7)|(1<<8) }, morley: { b: (1<<3)|(1<<6)|(1<<8), s: (1<<2)|(1<<4)|(1<<5) } };
+        function stepLife() {
+            const ruleKey = document.getElementById('lifeRule').value; const rule = LIFE_RULES[ruleKey] || LIFE_RULES.life;
+            nextGrid.fill(0);
+            for (let y = 1; y < GRID_SIZE - 1; y++) {
+                let rowOffset = y * GRID_SIZE;
+                for (let x = 1; x < GRID_SIZE - 1; x++) {
+                    const idx = rowOffset + x;
+                    let neighbors = lifeGrid[idx - GRID_SIZE - 1] + lifeGrid[idx - GRID_SIZE] + lifeGrid[idx - GRID_SIZE + 1] + lifeGrid[idx - 1] + lifeGrid[idx + 1] + lifeGrid[idx + GRID_SIZE - 1] + lifeGrid[idx + GRID_SIZE] + lifeGrid[idx + GRID_SIZE + 1];
+                    const cell = lifeGrid[idx];
+                    if (cell === 1) { if ((rule.s >> neighbors) & 1) nextGrid[idx] = 1; } else { if ((rule.b >> neighbors) & 1) nextGrid[idx] = 1; }
+                }
+            }
+            let temp = lifeGrid; lifeGrid = nextGrid; nextGrid = temp; renderLifeFrame();
+        }
+        function renderLifeFrame() {
+            const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
+            const colorInput = document.getElementById('layerColor').value; const rgb = hexToRgb(colorInput);
+            let count = 0;
+            for (let i = 0; i < TOTAL_ITEMS; i++) { if (lifeGrid[i]) { const idx = i * 4; data[idx] = rgb[0]; data[idx+1] = rgb[1]; data[idx+2] = rgb[2]; data[idx+3] = 255; count++; } }
+            ctx.putImageData(imgData, 0, 0); countSpan.textContent = count.toLocaleString();
+        }
+
+        function applyTransform() { canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`; }
+        function fitToScreen() { const rect = container.getBoundingClientRect(); const s = Math.min((rect.width-20)/GRID_SIZE, (rect.height-20)/GRID_SIZE, 1); scale = Math.max(s, 0.1); translateX = (rect.width - GRID_SIZE*scale)/2; translateY = (rect.height - GRID_SIZE*scale)/2; applyTransform(); }
+        setTimeout(fitToScreen, 100); window.addEventListener('resize', fitToScreen);
+        container.addEventListener('wheel', e => { e.preventDefault(); const rect = container.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; const factor = Math.exp((e.deltaY<0?1:-1)*0.1); const nextScale = scale * factor; translateX = mx - (mx - translateX) * factor; translateY = my - (my - translateY) * factor; scale = nextScale; applyTransform(); });
+
+        drawSpiral();
+    </script>
+</body>
+</html>
