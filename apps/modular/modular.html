@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moduláris Hullám Szimulátor</title>
+    <title>Modular Wave Simulator</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -168,17 +168,17 @@
 </head>
 <body>
 
-    <h1>Moduláris Hullám Szimulátor</h1>
+    <h1>Modular Wave Simulator</h1>
     <div class="subtitle">
-        Állítsd be a rács méretét (N) és a hullám frekvenciáját (k)!<br>
-        Figyeld meg, hogyan változik a mintázat prímszámoknál (pl. 13) és összetett számoknál (pl. 36).
+        Set the grid size (N) and the wave frequency (k)!<br>
+        Observe how the pattern changes with prime numbers (e.g., 13) and composite numbers (e.g., 36).
     </div>
 
     <div class="controls">
         <!-- N Csúszka -->
         <div class="control-row">
             <div class="label-group">
-                <span class="label-title">Rács Mérete (N)</span>
+                <span class="label-title">Grid Size (N)</span>
                 <span id="valN" class="label-value">36</span>
             </div>
             <input type="range" id="inputN" min="3" max="36" step="1" value="36">
@@ -187,7 +187,7 @@
         <!-- K Csúszka -->
         <div class="control-row">
             <div class="label-group">
-                <span class="label-title">Frekvencia (k)</span>
+                <span class="label-title">Frequency (k)</span>
                 <span id="valK" class="label-value">1</span>
             </div>
             <input type="range" id="inputK" min="1" max="35" step="1" value="1">
@@ -326,7 +326,7 @@
         ctx.textAlign = 'center';
         ctx.translate(15, canvasHeight/2);
         ctx.rotate(-Math.PI/2);
-        ctx.fillText("MARADÉK", 0, 0);
+        ctx.fillText("REMAINDER", 0, 0);
         ctx.restore();
 
 
@@ -406,14 +406,14 @@
         const cycles = Math.floor(raw / currentN);
 
         let html = `<div class="info-text">`;
-        html += `Pozíció (x): <span class="highlight-cyan">${index}</span>`;
+        html += `Position (x): <span class="highlight-cyan">${index}</span>`;
         html += `<span class="separator">|</span>`;
-        html += `Szorzás: ${currentK} × ${index} = <span class="highlight-cyan">${raw}</span>`;
+        html += `Multiplication: ${currentK} × ${index} = <span class="highlight-cyan">${raw}</span>`;
         html += `<span class="separator">|</span>`;
-        html += `Moduló: ${raw} / ${currentN} = <b>${cycles}</b> egész, maradék: <span class="highlight">${mod}</span>`;
+        html += `Modulo: ${raw} / ${currentN} = <b>${cycles}</b> integer, remainder: <span class="highlight">${mod}</span>`;
         
         if (mod === 0) {
-            html += ` <span class="highlight">➔ TALÁLAT!</span>`;
+            html += ` <span class="highlight">➔ HIT!</span>`;
         }
         html += `</div>`;
 
