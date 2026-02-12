@@ -316,7 +316,8 @@
         
     <div id="infoBox" class="info-box">
         <div class="info-text">
-            Position (x): - <span class="separator">|</span> Multiplication: - <span class="separator">|</span> Modulo: -
+            <div style="margin-bottom: 4px;">Position (x): - <span class="separator">|</span> Multiplication: -</div>
+            <div>Modulo: -</div>
         </div>
     </div>
     </div>
@@ -518,9 +519,9 @@
     }
 
     // --- 4. Interakció ---
-    function handleMouseMove(e) {
+    function handleInteraction(clientX) {
         const rect = container.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
+        const mouseX = clientX - rect.left;
         
         let relativeX = mouseX - PADDING_LEFT;
         if (relativeX < 0) relativeX = 0;
@@ -530,6 +531,10 @@
         if (index < 0) index = 0;
         if (index >= currentN) index = currentN - 1;
 
+        updateMarkerAndInfo(index);
+    }
+
+    function updateMarkerAndInfo(index) {
         const markerPos = PADDING_LEFT + index * cellWidth + cellWidth/2;
         marker.style.left = markerPos + 'px';
         marker.style.display = 'block';
@@ -538,16 +543,16 @@
         const mod = raw % currentN;
         const cycles = Math.floor(raw / currentN);
 
-        let html = `<div class="info-text">`;
-        html += `Position (x): <span class="highlight-cyan">${index}</span>`;
-        html += `<span class="separator">|</span>`;
-        html += `Multiplication: ${currentK} × ${index} = <span class="highlight-cyan">${raw}</span>`;
-        html += `<span class="separator">|</span>`;
-        html += `Modulo: ${raw} / ${currentN} = <b>${cycles}</b> integer, remainder: <span class="highlight">${mod}</span>`;
-        
+        let hitHtml = '';
         if (mod === 0) {
-            html += ` <span class="highlight">➔ HIT!</span>`;
+            hitHtml = ` <span class="highlight">➔ HIT!</span>`;
         }
+
+        let html = `<div class="info-text">`;
+        html += `<div style="margin-bottom: 4px;">Position (x): <span class="highlight-cyan">${index}</span>`;
+        html += `<span class="separator">|</span>`;
+        html += `Multiplication: ${currentK} × ${index} = <span class="highlight-cyan">${raw}</span></div>`;
+        html += `<div>Modulo: ${raw} / ${currentN} = <b>${cycles}</b> integer, remainder: <span class="highlight">${mod}</span>${hitHtml}</div>`;
         html += `</div>`;
 
         infoBox.innerHTML = html;
@@ -556,7 +561,8 @@
     function resetInfoBox() {
         infoBox.innerHTML = `
         <div class="info-text">
-            Position (x): - <span class="separator">|</span> Multiplication: - <span class="separator">|</span> Modulo: -
+            <div style="margin-bottom: 4px;">Position (x): - <span class="separator">|</span> Multiplication: -</div>
+            <div>Modulo: -</div>
         </div>`;
     }
 
@@ -588,11 +594,23 @@
         draw();
     });
 
-    container.addEventListener('mousemove', handleMouseMove);
+    // Mouse Events
+    container.addEventListener('mousemove', (e) => handleInteraction(e.clientX));
     container.addEventListener('mouseleave', () => {
         marker.style.display = 'none';
         resetInfoBox();
     });
+
+    // Touch Events
+    container.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // Prevent scrolling
+        handleInteraction(e.touches[0].clientX);
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (e) => {
+        e.preventDefault(); // Prevent scrolling
+        handleInteraction(e.touches[0].clientX);
+    }, { passive: false });
     
     window.addEventListener('resize', resize);
 
