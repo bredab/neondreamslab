@@ -141,7 +141,7 @@
             justify-content: center;
             border-radius: 3px;
             font-weight: bold;
-            font-size: clamp(8px, 1.5vw, 20px); 
+            font-size: var(--cell-font-size, clamp(8px, 1.5vw, 20px)); 
             transition: transform 0.2s, background-color 0.3s;
             position: relative;
             box-sizing: border-box; /* Ensure border doesn't add size */
@@ -411,7 +411,30 @@
                 if (i === 1) cell.style.opacity = '0.3';
                 grid.appendChild(cell);
             }
+            updateCellFontSize();
         }
+
+        function updateCellFontSize() {
+            // Calculate optimal font size based on cell width
+            // We want to fit up to 3 digits. 
+            // Approx width of 3 digits is usually fontSize * 2.5 (roughly)
+            // Cell width ~ gridWidth / GRID_SIZE
+            const gridWidth = grid.clientWidth;
+            const cellWidth = (gridWidth / GRID_SIZE) - 4; // Subtract borders/gap roughly
+            
+            // Heuristic: font size should be about 40% of cell width, but clamped
+            let fontSize = Math.floor(cellWidth * 0.45);
+            
+            // Enforce limits
+            if (fontSize < 8) fontSize = 8; // Absolute minimum readable
+            if (fontSize > 24) fontSize = 24; // Maximum
+
+            // Apply to all cells via a CSS variable or direct style
+            // Using a CSS variable on the grid container is most efficient
+            grid.style.setProperty('--cell-font-size', fontSize + 'px');
+        }
+
+        window.addEventListener('resize', updateCellFontSize);
 
         function resetGrid() {
             isAnimating = false;
