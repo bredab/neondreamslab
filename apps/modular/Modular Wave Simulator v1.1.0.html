@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modular Wave Simulator v1.0.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Modular Wave Simulator v1.1.0</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -19,44 +22,59 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            flex-direction: row; /* Sidebar layout */
+            align-items: stretch;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             height: 100vh;
+            overflow: hidden;
             box-sizing: border-box;
         }
 
-        h1 { margin: 0 0 10px 0; font-weight: 300; letter-spacing: 2px; color: #fff; }
-        .subtitle { font-size: 14px; color: #888; margin-bottom: 20px; max-width: 600px; text-align: center; line-height: 1.5; }
+        /* Sidebar Styling */
+        .sidebar {
+            width: 320px;
+            background: #0f0f15;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 1px solid #333;
+            z-index: 10;
+            overflow-y: auto;
+            flex-shrink: 0;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin: 0 0 5px 0; font-weight: 300; letter-spacing: 2px; color: #fff; font-size: 20px; }
+        .subtitle { font-size: 13px; color: #888; margin-bottom: 10px; line-height: 1.4; text-align: left; }
 
         .controls {
             background: var(--panel-bg);
-            padding: 20px;
-            border-radius: 12px;
+            padding: 15px;
+            border-radius: 8px;
             border: 1px solid #333;
             width: 100%;
-            max-width: 900px;
-            margin-bottom: 20px;
             display: flex;
-            flex-direction: column; /* Egymás alá kerülnek a csúszkák */
+            flex-direction: column;
             gap: 15px;
-            box-shadow: 0 0 15px rgba(0, 243, 255, 0.05);
+            box-sizing: border-box;
         }
 
         .control-row {
             display: flex;
-            align-items: center;
-            gap: 20px;
+            flex-direction: column; /* Stack label and input on sidebar */
+            align-items: flex-start;
+            gap: 5px;
             width: 100%;
         }
 
-        .label-group { display: flex; flex-direction: column; min-width: 140px; }
+        .label-group { display: flex; justify-content: space-between; width: 100%; align-items: center; }
         .label-title { font-size: 12px; color: #666; font-weight: bold; text-transform: uppercase; }
-        .label-value { font-family: monospace; font-size: 24px; color: var(--accent-cyan); font-weight: bold; }
+        .label-value { font-family: monospace; font-size: 18px; color: var(--accent-cyan); font-weight: bold; }
 
         input[type=range] {
-            flex-grow: 1;
+            width: 100%;
             cursor: pointer;
             accent-color: var(--accent-cyan);
             height: 6px;
@@ -64,32 +82,51 @@
             border-radius: 3px;
         }
 
-        /* INFÓ DOBOZ */
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            position: relative;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* INFÓ DOBOZ - Now at the bottom or top of main content */
         .info-box {
-            min-height: 60px;
+            min-height: 50px;
             width: 100%;
-            max-width: 900px;
-            background: #0f0f15;
+            background: rgba(15, 15, 21, 0.8);
             border-left: 4px solid var(--accent-pink);
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 10px 20px;
-            margin-bottom: 10px;
+            justify-content: flex-start;
+            padding: 10px 15px;
+            margin-bottom: 15px; /* Spacing below info box */
             box-sizing: border-box;
-            border-radius: 0 8px 8px 0;
+            border-radius: 4px;
             opacity: 0;
             transition: opacity 0.2s;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 20;
+            pointer-events: none;
         }
         
         .info-text {
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 15px;
+            font-size: 14px;
             color: #fff;
             width: 100%;
             text-align: left;
-            line-height: 1.6;
+            line-height: 1.4;
             white-space: normal;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
         .info-box.visible { opacity: 1; }
@@ -101,9 +138,10 @@
         .vis-container {
             position: relative;
             width: 100%;
-            max-width: 900px;
+            height: 100%; /* Fill available space */
             display: flex;
             flex-direction: column;
+            justify-content: center; /* Center vertically if needed */
         }
 
         canvas {
@@ -112,6 +150,10 @@
             border: 1px solid #333;
             border-bottom: none;
             cursor: crosshair;
+            width: 100%;
+            height: 100%; /* Fill container */
+            object-fit: contain; /* Or fill depending on resize logic */
+            display: block;
         }
 
         .pixel-row-wrapper {
@@ -123,6 +165,7 @@
             padding-right: 20px; 
             box-sizing: border-box;
             width: 100%;
+            flex-shrink: 0; /* Don't shrink */
         }
 
         .pixel-row {
@@ -155,57 +198,134 @@
 
         #hoverMarker {
             position: absolute;
-            top: 30px; 
-            bottom: 60px; 
+            top: 0; 
+            bottom: 40px; /* Adjust based on pixel row height */
             width: 1px;
             background: rgba(255, 255, 255, 0.5);
             pointer-events: none;
             display: none;
             border-left: 1px dashed rgba(255,255,255,0.2);
+            z-index: 5;
+        }
+
+        /* Mobile & Responsive Additions */
+        #rotate-warning { 
+            display: none; 
+        }
+
+        #fullscreen-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            z-index: 1000;
+            font-size: 12px;
+            text-transform: uppercase;
+            width: auto;
+        }
+        
+        #fullscreen-btn:hover {
+            background: var(--accent-cyan);
+            color: #000;
+            border-color: var(--accent-cyan);
+        }
+
+        @media screen and (orientation: portrait) {
+            .sidebar, .main-content, #fullscreen-btn { 
+                display: none !important; 
+            }
+            #rotate-warning {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                position: fixed;
+                top: 0; 
+                left: 0;
+                width: 100%; 
+                height: 100%;
+                background: #050505;
+                color: #fff;
+                font-family: Arial, sans-serif;
+                text-align: center;
+                z-index: 9999;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+        }
+
+        @media screen and (max-width: 900px) and (orientation: landscape) {
+            .sidebar {
+                width: 240px;
+                padding: 10px;
+                gap: 10px;
+            }
+            h1 { font-size: 16px; }
+            .subtitle { font-size: 11px; }
+            .controls { padding: 10px; gap: 10px; }
+            .label-value { font-size: 16px; }
+            .main-content { padding: 10px; }
         }
 
     </style>
 </head>
 <body>
 
-    <h1>Modular Wave Simulator v1.0.0</h1>
-    <div class="subtitle">
-        Set the number (N) and the wave frequency (k)!<br>
-        Observe how the pattern changes with prime numbers (e.g., 13) and composite numbers (e.g., 36).
+    <div id="rotate-warning">
+        <div style="font-size: 50px; margin-bottom: 20px;">🔄</div>
+        <h2>Please Rotate Your Device</h2>
+        <p>This experiment requires landscape mode.</p>
     </div>
 
-    <div class="controls">
-        <!-- N Csúszka -->
-        <div class="control-row">
-            <div class="label-group">
-                <span class="label-title">Number (N)</span>
-                <span id="valN" class="label-value">36</span>
+    <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
+
+    <div class="sidebar">
+        <h1>Modular Wave Simulator v1.1.0</h1>
+        <div class="subtitle">
+            Set the number (N) and the wave frequency (k)!<br>
+            Observe how the pattern changes with prime numbers (e.g., 13) and composite numbers (e.g., 36).
+        </div>
+
+        <div class="controls">
+            <!-- N Csúszka -->
+            <div class="control-row">
+                <div class="label-group">
+                    <span class="label-title">Number (N)</span>
+                    <span id="valN" class="label-value">36</span>
+                </div>
+                <input type="range" id="inputN" min="3" max="36" step="1" value="36">
             </div>
-            <input type="range" id="inputN" min="3" max="36" step="1" value="36">
-        </div>
 
-        <!-- K Csúszka -->
-        <div class="control-row">
-            <div class="label-group">
-                <span class="label-title">Frequency (k)</span>
-                <span id="valK" class="label-value">1</span>
+            <!-- K Csúszka -->
+            <div class="control-row">
+                <div class="label-group">
+                    <span class="label-title">Frequency (k)</span>
+                    <span id="valK" class="label-value">1</span>
+                </div>
+                <input type="range" id="inputK" min="1" max="35" step="1" value="1">
             </div>
-            <input type="range" id="inputK" min="1" max="35" step="1" value="1">
         </div>
     </div>
 
-    <div id="infoBox" class="info-box">
-        ...
-    </div>
-
-    <div class="vis-container" id="visContainer">
-        <canvas id="waveCanvas" height="320"></canvas>
-        
-        <div class="pixel-row-wrapper">
-            <div id="pixelRow" class="pixel-row"></div>
+    <div class="main-content">
+        <div class="vis-container" id="visContainer">
+            <canvas id="waveCanvas"></canvas>
+            
+            <div class="pixel-row-wrapper">
+                <div id="pixelRow" class="pixel-row"></div>
+            </div>
+            
+            <div id="hoverMarker"></div>
         </div>
         
-        <div id="hoverMarker"></div>
+        <div id="infoBox" class="info-box">
+            ...
+        </div>
     </div>
 
 <script>
@@ -251,7 +371,17 @@
     function resize() {
         const rect = container.getBoundingClientRect();
         canvasWidth = rect.width;
-        canvasHeight = 320; 
+        // Calculate available height: container height - pixel row height (42px approx)
+        // pixel-row-wrapper height is around 40px + padding/borders. Let's say 42px.
+        // But we want the canvas to fill the remaining space.
+        // The container is flex column. Canvas should flex-grow.
+        // However, setting canvas.height affects internal resolution.
+        // We can use the container height minus the bottom part.
+        
+        const wrapperHeight = 42; 
+        const availableHeight = rect.height - wrapperHeight;
+        
+        canvasHeight = Math.max(200, availableHeight); 
         
         graphWidth = canvasWidth - PADDING_LEFT - PADDING_RIGHT;
         graphHeight = canvasHeight - PADDING_TOP - PADDING_BOTTOM;
@@ -261,6 +391,16 @@
         
         cellWidth = graphWidth / currentN; // Fontos: az új N-el számolunk
         draw();
+    }
+
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
     }
 
     // --- 3. Rajzolás ---
