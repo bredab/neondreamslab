@@ -126,10 +126,11 @@
 
         #grid {
             display: grid;
-            gap: 3px;
+            gap: 2px;
             width: 100%;
             height: 100%;
             /* Columns will be set by JS */
+            min-width: 0; /* Allow grid to shrink below content size if needed */
         }
 
         .cell {
@@ -145,6 +146,8 @@
             position: relative;
             box-sizing: border-box; /* Ensure border doesn't add size */
             border: 1px solid transparent; /* Reserve space for border */
+            min-width: 0; /* Allow flex item to shrink below content size */
+            overflow: hidden; /* Hide overflow content if it gets too small */
         }
 
         .cell.prime {
