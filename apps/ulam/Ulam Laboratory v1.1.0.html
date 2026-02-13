@@ -22,25 +22,61 @@
         }
         
         .controls {
-            position: sticky;
-            top: 20px;
+            position: fixed; /* Changed to fixed for sidebar toggle */
+            left: 0; top: 0; bottom: 0;
             z-index: 100;
             background: #2d2d2d;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 0; /* Reset padding for sections */
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            align-items: stretch;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            margin-right: 20px;
-            min-width: 280px;
-            max-width: 300px;
-            border: 1px solid #444;
+            width: 300px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5);
+            border-right: 1px solid #444;
             overflow-y: auto;
-            max-height: 98vh;
+            transition: transform 0.3s ease;
         }
-        .control-group { display: flex; flex-direction: column; }
+        .controls.hidden { transform: translateX(-100%); }
+        
+        .sidebar-toggle {
+            position: fixed;
+            top: 10px; left: 10px;
+            z-index: 200;
+            background: #2d2d2d;
+            color: #eee;
+            border: 1px solid #444;
+            border-radius: 4px;
+            width: 32px; height: 32px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: left 0.3s ease;
+        }
+        .controls:not(.hidden) + .sidebar-toggle { left: 310px; } /* Move button when sidebar is open */
+
+        /* Accordion Styles */
+        .control-section { border-bottom: 1px solid #444; }
+        .section-header {
+            padding: 12px 15px;
+            background: #333;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+            color: #eee;
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .section-header:hover { background: #3a3a3a; }
+        .section-content {
+            padding: 15px;
+            display: flex; flex-direction: column; gap: 10px;
+            background: #262626;
+        }
+        .section-content.collapsed { display: none; }
+        .arrow { transition: transform 0.2s; font-size: 0.7rem; }
+        .section-content.collapsed + .arrow { transform: rotate(-90deg); } /* Logic handled in JS mostly */
+
+        .control-group { display: flex; flex-direction: column; margin-bottom: 5px; }
         label { font-size: 0.75rem; margin-bottom: 4px; color: #bbb; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; }
         input[type="number"], select { background: #3a3a3a; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; font-size: 0.9rem; }
         input[type="number"]:focus, select:focus { outline: none; border-color: #007bff; }
@@ -71,10 +107,18 @@
 
         .add-layer-group { display: flex; gap: 5px; align-items: center; }
         input[type="color"] { background: none; border: none; width: 40px; height: 36px; cursor: pointer; padding: 0; }
-        .main-action-btn { background: #007bff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; flex-grow: 1; font-size: 0.8rem; text-transform: uppercase; }
-        .main-action-btn:hover { background: #0056b3; }
+        .main-action-btn { 
+            background: linear-gradient(to bottom, #007bff, #0069d9); 
+            color: white; border: 1px solid #0056b3; 
+            padding: 8px; border-radius: 4px; cursor: pointer; 
+            font-weight: bold; flex-grow: 1; font-size: 0.8rem; text-transform: uppercase; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .main-action-btn:hover { background: linear-gradient(to bottom, #0069d9, #0056b3); }
         
-        .layer-list { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid #444; padding-top: 10px; min-height: 50px; max-height: 300px; overflow-y: auto; }
+        .layer-list { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; margin-top: 0; min-height: 50px; max-height: 250px; overflow-y: auto; padding-right: 5px; }
+        .layer-list::-webkit-scrollbar { width: 6px; }
+        .layer-list::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
         .layer-item { background: #333; padding: 6px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid transparent; flex-shrink: 0; }
         .layer-item.hidden-layer { opacity: 0.5; background: #252525; }
         .layer-info { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; flex: 1; min-width: 0; }
@@ -83,17 +127,48 @@
         .icon-btn:hover { background: #555; }
         .btn-delete:hover { background: #602020; border-color: #ff4444; }
 
-        .canvas-container { background-color: #000; box-shadow: 0 0 40px rgba(0,0,0,0.8); overflow: hidden; flex-grow: 1; display: block; position: relative; height: 100%; border: 1px solid #333; cursor: crosshair; border-radius: 4px; }
+        .canvas-container { 
+            background-color: #000; 
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8); 
+            overflow: hidden; 
+            flex-grow: 1; 
+            display: block; 
+            position: relative; 
+            height: 100%; 
+            margin-left: 300px; /* Offset for sidebar */
+            transition: margin-left 0.3s ease;
+        }
+        .controls.hidden ~ .canvas-container { margin-left: 0; }
         canvas { display: block; image-rendering: pixelated; transform-origin: 0 0; }
 
-        .gol-section { margin-top: 10px; border-top: 1px solid #444; padding-top: 10px; background: #252525; padding: 10px; border-radius: 6px; }
+        /* Canvas Overlay Controls */
+        .canvas-controls {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            display: flex; gap: 5px;
+            z-index: 50;
+        }
+        .canvas-btn {
+            width: 36px; height: 36px;
+            background: rgba(40, 40, 40, 0.8);
+            border: 1px solid #555;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .canvas-btn:hover { background: rgba(60, 60, 60, 0.9); transform: scale(1.1); }
+
         .gol-controls { display: flex; gap: 5px; margin-top: 8px; }
-        .gol-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .gol-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 0.8rem; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .gol-btn:active { transform: translateY(1px); box-shadow: none; }
         
-        .secondary-btn { background: #555; color: white; border: none; padding: 8px; width: 100%; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        .secondary-btn { background: #555; color: white; border: none; padding: 8px; width: 100%; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; transition: background 0.2s; }
         .secondary-btn:hover { background: #666; }
-        .delete-all-btn { background: #882222; }
-        .delete-all-btn:hover { background: #aa3333; }
+        .delete-all-btn { background: #a72828; }
+        .delete-all-btn:hover { background: #c53030; }
 
         .helper-text { font-size: 0.7rem; color: #888; margin-top: 5px; font-style: italic; text-align: center; }
 
@@ -134,95 +209,134 @@
 </head>
 <body>
 
-    <div class="controls">
-        <label>Kurzor Info</label>
-        <div class="info-panel" id="statusPanel">
-            <div class="info-row"><span class="info-label">Pozíció:</span> <span class="info-val" id="infoPos">-</span></div>
-            <div class="info-row"><span class="info-label">Index:</span> <span class="info-val" id="infoIdx">-</span></div>
-            <div style="font-size:0.75rem; color:#888; margin-top:5px;">Számérték (Szekvencia):</div>
-            <div class="info-big" id="infoVal">-</div>
-        </div>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Vezérlőpanel elrejtése/megjelenítése">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
 
-        <div class="control-group">
-            <label for="startValue">Kezdőérték</label>
-            <input type="number" id="startValue" value="0" min="0" oninput="drawSpiral()">
-        </div>
-        <div class="control-group">
-            <label for="increment">Növekmény</label>
-            <input type="number" id="increment" value="1" min="1" oninput="drawSpiral()">
-        </div>
+    <div class="controls" id="sidebar">
         
-        <div class="mode-selector">
-            <label><input type="radio" name="ulamMode" value="prime" checked onchange="drawSpiral()"> Prím</label>
-            <label><input type="radio" name="ulamMode" value="square" onchange="drawSpiral()"> Négyzet</label>
-            <label><input type="radio" name="ulamMode" value="cube" onchange="drawSpiral()"> Köb</label>
-            <label><input type="radio" name="ulamMode" value="step" onchange="drawSpiral()"> Szekvencia</label>
+        <!-- SECTION 1: KURZOR & INFÓ -->
+        <div class="control-section">
+            <div class="section-header" onclick="toggleSection(this)">Kurzor & Infó <span class="arrow">▼</span></div>
+            <div class="section-content">
+                <div class="info-panel" id="statusPanel">
+                    <div class="info-row"><span class="info-label">Pozíció:</span> <span class="info-val" id="infoPos">-</span></div>
+                    <div class="info-row"><span class="info-label">Index:</span> <span class="info-val" id="infoIdx">-</span></div>
+                    <div style="font-size:0.75rem; color:#888; margin-top:5px;">Számérték (Szekvencia):</div>
+                    <div class="info-big" id="infoVal">-</div>
+                </div>
+            </div>
         </div>
 
-        <label style="margin-top:10px;">Új réteg hozzáadása / Szín</label>
-        <div class="add-layer-group">
-            <input type="color" id="layerColor" value="#ffff00" title="Válassz színt" oninput="onColorChange()">
-            <button class="main-action-btn" onclick="addLayer()">+ Hozzáadás</button>
-        </div>
-
-        <div class="layer-list" id="layerList"></div>
-        
-        <button class="secondary-btn delete-all-btn" onclick="deleteAllLayers()">Minden törlése</button>
-        <button class="secondary-btn" onclick="saveImage()">Kép mentése (PNG)</button>
-        
-        <div class="stats">Pixel db: <span id="matchCount">0</span></div>
-        <div class="helper-text">SHIFT + Klikk: Pixel invertálása</div>
-
-        <div class="gol-section">
-            <label>Életjáték Szabályok</label>
-            <select id="lifeRule" onchange="toggleRuleEditor()">
-                <option value="life" selected>Game of Life (B3/S23)</option>
-                <option value="highlife">HighLife (B36/S23)</option>
-                <option value="daynight">Day & Night (B3678/S34678)</option>
-                <option value="seeds">Seeds (B2/S)</option>
-                <option value="diamoeba">Diamoeba (B35678/S5678)</option>
-                <option value="morley">Morley (B368/S245)</option>
-                <!-- ÚJ OPCIÓK -->
-                <option value="replicator">Replicator (B1357/S1357)</option>
-                <option value="walledcities">Walled Cities (B45678/S2345)</option>
-                <option value="stains">Stains (B3678/S235678)</option>
-                <option value="maze">Maze (B3/S12345)</option>
-                <option value="anneal">Anneal (B4678/S35678)</option>
-                <option value="custom" style="font-weight:bold; color:#ffcc00;">🛠️ Egyéni Szabály...</option>
-            </select>
-
-            <!-- EGYÉNI SZABÁLY SZERKESZTŐ (Alapból rejtve) -->
-            <div id="customRuleEditor" style="display:none; background:#333; padding:8px; border-radius:4px; margin-top:5px; border:1px solid #555;">
-                <div style="font-size:0.75rem; color:#bbb; margin-bottom:4px;">SZÜLETÉS (Born): Hány szomszédnál?</div>
-                <div class="bit-selector" id="bornSelector">
-                    <!-- JS generálja majd -->
+        <!-- SECTION 2: ULAM PARAMÉTEREK -->
+        <div class="control-section">
+            <div class="section-header" onclick="toggleSection(this)">Ulam Paraméterek <span class="arrow">▼</span></div>
+            <div class="section-content">
+                <div class="control-group">
+                    <label for="startValue">Kezdőérték</label>
+                    <input type="number" id="startValue" value="0" min="0" oninput="drawSpiral()">
+                </div>
+                <div class="control-group">
+                    <label for="increment">Növekmény</label>
+                    <input type="number" id="increment" value="1" min="1" oninput="drawSpiral()">
                 </div>
                 
-                <div style="font-size:0.75rem; color:#bbb; margin:6px 0 4px 0;">TÚLÉLÉS (Survive): Hány szomszédnál?</div>
-                <div class="bit-selector" id="surviveSelector">
-                    <!-- JS generálja majd -->
+                <div class="mode-selector">
+                    <label><input type="radio" name="ulamMode" value="prime" checked onchange="drawSpiral()"> Prím</label>
+                    <label><input type="radio" name="ulamMode" value="square" onchange="drawSpiral()"> Négyzet</label>
+                    <label><input type="radio" name="ulamMode" value="cube" onchange="drawSpiral()"> Köb</label>
+                    <label><input type="radio" name="ulamMode" value="step" onchange="drawSpiral()"> Szekvencia</label>
                 </div>
-                <div id="ruleNameDisplay" style="text-align:center; font-size:0.8rem; color:#00ffaa; margin-top:5px;">B3/S23</div>
-            </div>            
-            <div style="margin-top:8px; border-top:1px solid #444; padding-top:8px;">
-                <label>Színezési Mód</label>
-                <select id="colorMode" onchange="onColorModeChange()">
-                    <option value="static">Statikus (Alap)</option>
-                    <option value="trail">Utóhúzás (Trail)</option>
-                    <option value="age">Életkor (Age)</option>
-                </select>
             </div>
-
-            <div class="gol-controls">
-                <button class="gol-btn" id="btnStart" onclick="toggleLife()" style="background: #28a745;">Start</button>
-                <button class="gol-btn" onclick="resetLife()" style="background: #17a2b8;">Reset</button>
-            </div>
-            <button class="gol-btn" onclick="clearScreen()" style="background: #d63384; margin-top:5px; width:100%;">Törlés (Clear)</button>
         </div>
+
+        <!-- SECTION 3: RÉTEGEK -->
+        <div class="control-section">
+            <div class="section-header" onclick="toggleSection(this)">Rétegek <span class="arrow">▼</span></div>
+            <div class="section-content">
+                <label>Új réteg hozzáadása / Szín</label>
+                <div class="add-layer-group">
+                    <input type="color" id="layerColor" value="#ffff00" title="Válassz színt" oninput="onColorChange()">
+                    <button class="main-action-btn" onclick="addLayer()">+ Hozzáadás</button>
+                </div>
+                <div class="layer-list" id="layerList"></div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: ÉLETJÁTÉK -->
+        <div class="control-section">
+            <div class="section-header" onclick="toggleSection(this)">Életjáték <span class="arrow">▼</span></div>
+            <div class="section-content">
+                <label>Szabályok</label>
+                <select id="lifeRule" onchange="toggleRuleEditor()">
+                    <option value="life" selected>Game of Life (B3/S23)</option>
+                    <option value="highlife">HighLife (B36/S23)</option>
+                    <option value="daynight">Day & Night (B3678/S34678)</option>
+                    <option value="seeds">Seeds (B2/S)</option>
+                    <option value="diamoeba">Diamoeba (B35678/S5678)</option>
+                    <option value="morley">Morley (B368/S245)</option>
+                    <option value="replicator">Replicator (B1357/S1357)</option>
+                    <option value="walledcities">Walled Cities (B45678/S2345)</option>
+                    <option value="stains">Stains (B3678/S235678)</option>
+                    <option value="maze">Maze (B3/S12345)</option>
+                    <option value="anneal">Anneal (B4678/S35678)</option>
+                    <option value="custom" style="font-weight:bold; color:#ffcc00;">🛠️ Egyéni Szabály...</option>
+                </select>
+
+                <!-- EGYÉNI SZABÁLY SZERKESZTŐ (Alapból rejtve) -->
+                <div id="customRuleEditor" style="display:none; background:#333; padding:8px; border-radius:4px; margin-top:5px; border:1px solid #555;">
+                    <div style="font-size:0.75rem; color:#bbb; margin-bottom:4px;">SZÜLETÉS (Born): Hány szomszédnál?</div>
+                    <div class="bit-selector" id="bornSelector"></div>
+                    <div style="font-size:0.75rem; color:#bbb; margin:6px 0 4px 0;">TÚLÉLÉS (Survive): Hány szomszédnál?</div>
+                    <div class="bit-selector" id="surviveSelector"></div>
+                    <div id="ruleNameDisplay" style="text-align:center; font-size:0.8rem; color:#00ffaa; margin-top:5px;">B3/S23</div>
+                </div>            
+                
+                <div style="margin-top:8px; border-top:1px solid #444; padding-top:8px;">
+                    <label>Színezési Mód</label>
+                    <select id="colorMode" onchange="onColorModeChange()">
+                        <option value="static">Statikus (Alap)</option>
+                        <option value="trail">Utóhúzás (Trail)</option>
+                        <option value="age">Életkor (Age)</option>
+                    </select>
+                </div>
+
+                <div class="gol-controls">
+                    <button class="gol-btn" id="btnStart" onclick="toggleLife()" style="background: #28a745;">Start</button>
+                    <button class="gol-btn" onclick="resetLife()" style="background: #17a2b8;">Reset</button>
+                </div>
+                <button class="gol-btn" onclick="clearScreen()" style="background: #d63384; margin-top:5px; width:100%;">Törlés (Clear)</button>
+            </div>
+        </div>
+
+        <!-- SECTION 5: MŰVELETEK & PROJEKT -->
+        <div class="control-section">
+            <div class="section-header" onclick="toggleSection(this)">Műveletek <span class="arrow">▼</span></div>
+            <div class="section-content">
+                <div class="stats">Pixel db: <span id="matchCount">0</span></div>
+                <div class="helper-text" style="margin-bottom:10px;">SHIFT + Klikk: Pixel invertálása</div>
+                
+                <button class="secondary-btn delete-all-btn" onclick="deleteAllLayers()">Minden törlése</button>
+                <button class="secondary-btn" onclick="saveImage()">Kép mentése (PNG)</button>
+                
+                <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
+                    <label>Projekt Mentés / Betöltés</label>
+                    <button class="secondary-btn" onclick="exportConfig()" style="background:#555; margin-bottom:5px;">Mentés Fájlba (JSON)</button>
+                    <button class="secondary-btn" onclick="document.getElementById('fileInput').click()" style="background:#555;">Betöltés Fájlból</button>
+                    <input type="file" id="fileInput" style="display:none" onchange="importConfig(this)" accept=".json">
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div class="canvas-container">
         <canvas id="ulamCanvas" width="1001" height="1001"></canvas>
+        <div class="canvas-controls">
+            <button class="canvas-btn" onclick="zoomCanvas(1.2)" title="Nagyítás">+</button>
+            <button class="canvas-btn" onclick="zoomCanvas(0.8)" title="Kicsinyítés">-</button>
+            <button class="canvas-btn" onclick="fitToScreen()" title="Képernyőre igazítás">⟲</button>
+        </div>
     </div>
 
     <script>
@@ -731,6 +845,100 @@
         function fitToScreen() { const rect = container.getBoundingClientRect(); const s = Math.min((rect.width-20)/GRID_SIZE, (rect.height-20)/GRID_SIZE, 1); scale = Math.max(s, 0.1); translateX = (rect.width - GRID_SIZE*scale)/2; translateY = (rect.height - GRID_SIZE*scale)/2; applyTransform(); }
         setTimeout(fitToScreen, 100); window.addEventListener('resize', fitToScreen);
         container.addEventListener('wheel', e => { e.preventDefault(); const rect = container.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; const factor = Math.exp((e.deltaY<0?1:-1)*0.1); const nextScale = scale * factor; translateX = mx - (mx - translateX) * factor; translateY = my - (my - translateY) * factor; scale = nextScale; applyTransform(); });
+
+        // --- ÚJ GUI FUNKCIÓK ---
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            sb.classList.toggle('hidden');
+        }
+
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            content.classList.toggle('collapsed');
+        }
+
+        function zoomCanvas(factor) {
+            const rect = container.getBoundingClientRect();
+            // Zoom center (screen center)
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            
+            const nextScale = scale * factor;
+            translateX = cx - (cx - translateX) * factor;
+            translateY = cy - (cy - translateY) * factor;
+            scale = nextScale;
+            applyTransform();
+        }
+
+        function exportConfig() {
+            const config = {
+                layers: layers,
+                settings: getInputs(),
+                lifeRule: document.getElementById('lifeRule').value,
+                customRule: getCustomRuleMasks(), // Ez egy objektum {b,s}
+                customRuleChecks: {
+                    b: Array.from({length:9}, (_,i) => document.getElementById(`b${i}`).checked),
+                    s: Array.from({length:9}, (_,i) => document.getElementById(`s${i}`).checked)
+                },
+                colorMode: document.getElementById('colorMode').value
+            };
+            const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ulam_projekt.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importConfig(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const config = JSON.parse(e.target.result);
+                    
+                    // Rétegek betöltése
+                    if (config.layers) layers = config.layers;
+                    
+                    // Beállítások betöltése
+                    if (config.settings) {
+                        document.getElementById('startValue').value = config.settings.start;
+                        document.getElementById('increment').value = config.settings.incr;
+                        const modeRadio = document.querySelector(`input[name="ulamMode"][value="${config.settings.mode}"]`);
+                        if (modeRadio) modeRadio.checked = true;
+                        // Szín nem kritikus
+                    }
+
+                    // Életjáték szabályok
+                    if (config.lifeRule) {
+                        document.getElementById('lifeRule').value = config.lifeRule;
+                        toggleRuleEditor();
+                    }
+                    if (config.customRuleChecks && config.lifeRule === 'custom') {
+                        config.customRuleChecks.b.forEach((chk, i) => document.getElementById(`b${i}`).checked = chk);
+                        config.customRuleChecks.s.forEach((chk, i) => document.getElementById(`s${i}`).checked = chk);
+                        updateRuleString();
+                    }
+
+                    // Színezési mód
+                    if (config.colorMode) {
+                        document.getElementById('colorMode').value = config.colorMode;
+                    }
+
+                    // Frissítés
+                    updateLayerListUI();
+                    drawSpiral();
+                    if (config.colorMode === 'trail') onColorModeChange(); // Init trail grid
+                    alert("Sikeres betöltés!");
+                } catch (err) {
+                    alert("Hiba a fájl beolvasásakor: " + err);
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; // Reset input
+        }
 
         drawSpiral();
     </script>
