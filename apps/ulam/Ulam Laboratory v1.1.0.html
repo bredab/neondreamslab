@@ -74,10 +74,10 @@
         .main-action-btn { background: #007bff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; flex-grow: 1; font-size: 0.8rem; text-transform: uppercase; }
         .main-action-btn:hover { background: #0056b3; }
         
-        .layer-list { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid #444; padding-top: 10px; min-height: 50px; }
-        .layer-item { background: #333; padding: 6px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid transparent; }
+        .layer-list { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; margin-top: 5px; border-top: 1px solid #444; padding-top: 10px; min-height: 50px; max-height: 300px; overflow-y: auto; }
+        .layer-item { background: #333; padding: 6px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid transparent; flex-shrink: 0; }
         .layer-item.hidden-layer { opacity: 0.5; background: #252525; }
-        .layer-info { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; }
+        .layer-info { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; flex: 1; min-width: 0; }
         .layer-controls { display: flex; gap: 4px; }
         .icon-btn { background: #444; border: 1px solid #555; color: #eee; width: 24px; height: 24px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
         .icon-btn:hover { background: #555; }
@@ -204,6 +204,15 @@
                 </div>
                 <div id="ruleNameDisplay" style="text-align:center; font-size:0.8rem; color:#00ffaa; margin-top:5px;">B3/S23</div>
             </div>            
+            <div style="margin-top:8px; border-top:1px solid #444; padding-top:8px;">
+                <label>Színezési Mód</label>
+                <select id="colorMode" onchange="renderLifeFrame()">
+                    <option value="static">Statikus (Alap)</option>
+                    <option value="trail">Utóhúzás (Trail)</option>
+                    <option value="age">Életkor (Age)</option>
+                </select>
+            </div>
+
             <div class="gol-controls">
                 <button class="gol-btn" id="btnStart" onclick="toggleLife()" style="background: #28a745;">Start</button>
                 <button class="gol-btn" onclick="resetLife()" style="background: #17a2b8;">Reset</button>
@@ -238,6 +247,8 @@
         let isPaused = false;
         let lifeGrid = new Uint8Array(TOTAL_ITEMS);
         let nextGrid = new Uint8Array(TOTAL_ITEMS);
+        let displayGrid = new Float32Array(TOTAL_ITEMS); // Utóhúzás megjelenítéshez
+        let ageGrid = new Uint32Array(TOTAL_ITEMS);      // Életkor tárolásához
         let scale = 1, translateX = 0, translateY = 0;
         let panning = false, startX = 0, startY = 0;
 
@@ -404,6 +415,8 @@
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
             const queue = []; layers.forEach(l => { if(l.visible) queue.push(l); }); queue.push({ ...current, rgb: currentRgb });
             lifeGrid.fill(0);
+            displayGrid.fill(0); // Reset Trail
+            ageGrid.fill(0);     // Reset Age
             let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
             for (let i = 0; i < TOTAL_ITEMS; i++) {
                 let isAlive = 0;
@@ -414,6 +427,11 @@
                     if (isAlive) break;
                 }
                 const idx = (CY - y) * GRID_SIZE + (CX + x); if (manualEdits.has(idx)) isAlive = isAlive ? 0 : 1; lifeGrid[idx] = isAlive;
+                // Init extra grids
+                if (isAlive) {
+                    displayGrid[idx] = 255;
+                    ageGrid[idx] = 1;
+                }
                 if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
             }
             resumeLife();
@@ -518,14 +536,114 @@
                 }
             }
             // ... swap és renderelés ...
-            let temp = lifeGrid; lifeGrid = nextGrid; nextGrid = temp; renderLifeFrame();
+            let temp = lifeGrid; lifeGrid = nextGrid; nextGrid = temp;
+            
+            // Frissítsük az extra rácsokat (Trail és Age)
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                if (lifeGrid[i] === 1) {
+                    displayGrid[i] = 255;
+                    ageGrid[i]++; // Növeljük a kort
+                } else {
+                    displayGrid[i] = Math.max(0, displayGrid[i] * 0.9); // Csökkentjük a fényerőt
+                    ageGrid[i] = 0; // Reseteljük a kort
+                }
+            }
+
+            renderLifeFrame();
         }
 
         function renderLifeFrame() {
             const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
-            const colorInput = document.getElementById('layerColor').value; const rgb = hexToRgb(colorInput);
+            const colorInput = document.getElementById('layerColor').value; const baseRgb = hexToRgb(colorInput);
+            const mode = document.getElementById('colorMode').value;
             let count = 0;
-            for (let i = 0; i < TOTAL_ITEMS; i++) { if (lifeGrid[i]) { const idx = i * 4; data[idx] = rgb[0]; data[idx+1] = rgb[1]; data[idx+2] = rgb[2]; data[idx+3] = 255; count++; } }
+
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                const idx = i * 4;
+                let r = 0, g = 0, b = 0, a = 0;
+
+                if (mode === 'static') {
+                    if (lifeGrid[i]) {
+                        r = baseRgb[0]; g = baseRgb[1]; b = baseRgb[2]; a = 255;
+                        count++;
+                    }
+                } 
+                else if (mode === 'trail') {
+                    const val = displayGrid[i];
+                    if (val > 1) { // Csak ha látható
+                        // Színátmenet: BaseColor -> ... -> Black
+                        // Egyszerűsített: BaseColor sötétítése
+                        // A kérés: sárga -> vörös -> sötétlila -> fekete
+                        // Ehhez HSL jobb lenne, vagy egy trükkös RGB keverés.
+                        // Használjunk egy egyszerű intenzitás alapú sötétítést a választott színből.
+                        // Vagy ha sárga (255,255,0), akkor csökkentsük a Zöldet gyorsabban, hogy Vörös legyen?
+                        
+                        const intensity = val / 255;
+                        
+                        // Egyedi "tűz" effektus generálása a bázis színből
+                        // Ha a bázis szín világos (pl Sárga), akkor vörösbe hajlik.
+                        // Ha Kék, akkor sötétkékbe.
+                        
+                        // Próbáljuk megvalósítani a kért átmenetet a sárga példa alapján általánosan:
+                        // "Heat map" szerű színezés.
+                        
+                        // De tartsuk tiszteletben a felhasználó színválasztását?
+                        // "A 255-ös érték a kiválasztott 'Élő' szín."
+                        
+                        r = baseRgb[0] * intensity;
+                        g = baseRgb[1] * (intensity * intensity); // Gyorsabb sötétedés = szín eltolódás
+                        b = baseRgb[2] * (intensity * intensity * intensity);
+                        a = 255;
+                        
+                        if (lifeGrid[i]) count++;
+                    }
+                }
+                else if (mode === 'age') {
+                    if (lifeGrid[i]) {
+                        const age = ageGrid[i];
+                        let h, s, l;
+                        
+                        // HSL konverzió logikája a leírás alapján
+                        if (age === 1) {
+                            // Újszülött: Fehér (vagy majdnem fehér)
+                            h = 0; s = 0; l = 100; 
+                        } else if (age < 10) {
+                            // Fiatal: Zöld (120)
+                            h = 120; s = 100; l = 50;
+                        } else if (age < 100) {
+                            // Öreg: Kék (240)
+                            h = 240; s = 100; l = 50;
+                        } else {
+                            // Matuzsálem: Piros (0)
+                            h = 0; s = 100; l = 50;
+                        }
+
+                        // HSL to RGB konverzió (egyszerűsített vagy segédfüggvény)
+                        // Itt inline megoldjuk
+                        const c = (1 - Math.abs(2 * l / 100 - 1)) * (s / 100);
+                        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+                        const m = l / 100 - c / 2;
+                        let rP, gP, bP;
+
+                        if (h < 60) { rP=c; gP=x; bP=0; }
+                        else if (h < 120) { rP=x; gP=c; bP=0; }
+                        else if (h < 180) { rP=0; gP=c; bP=x; }
+                        else if (h < 240) { rP=0; gP=x; bP=c; }
+                        else if (h < 300) { rP=x; gP=0; bP=c; }
+                        else { rP=c; gP=0; bP=x; }
+
+                        r = (rP + m) * 255;
+                        g = (gP + m) * 255;
+                        b = (bP + m) * 255;
+                        a = 255;
+                        count++;
+                    }
+                }
+
+                if (a > 0) {
+                    data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = a;
+                }
+            }
             ctx.putImageData(imgData, 0, 0); countSpan.textContent = count.toLocaleString();
         }
 
