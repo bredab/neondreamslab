@@ -246,6 +246,7 @@
                     <label><input type="radio" name="ulamMode" value="square" onchange="drawSpiral()"> Négyzet</label>
                     <label><input type="radio" name="ulamMode" value="cube" onchange="drawSpiral()"> Köb</label>
                     <label><input type="radio" name="ulamMode" value="step" onchange="drawSpiral()"> Szekvencia</label>
+                    <label><input type="radio" name="ulamMode" value="empty" onchange="drawSpiral()"> Üres (Csak középpont)</label>
                 </div>
             </div>
         </div>
@@ -504,19 +505,32 @@
 
         function render() {
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
-            const queue = []; layers.forEach(l => { if(l.visible) queue.push(l); }); queue.push({ ...current, isPreview: true, rgb: currentRgb });
             const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
+            
+            // Ha 'empty' mód van kiválasztva, nem rajzoljuk ki a rétegeket, csak a kézi módosításokat
+            const showLayers = current.mode !== 'empty';
+            const queue = []; 
+            
+            if (showLayers) {
+                layers.forEach(l => { if(l.visible) queue.push(l); }); 
+                queue.push({ ...current, isPreview: true, rgb: currentRgb });
+            }
+
             let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
             let count = 0;
             for (let i = 0; i < TOTAL_ITEMS; i++) {
                 const cx = CX + x; const cy = CY - y; const pixelIndex = (cy * GRID_SIZE + cx) * 4; const manualIdx = cy * GRID_SIZE + cx;
                 let r=0, g=0, b=0, a=0;
-                for (let l = 0; l < queue.length; l++) {
-                    const layer = queue[l]; let isMatch = false;
-                    if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isMatch = true; }
-                    else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime') isMatch = isPrime(val); else if (layer.mode === 'square') isMatch = isSquare(val); else if (layer.mode === 'cube') isMatch = isCube(val); }
-                    if (isMatch) { r = layer.rgb[0]; g = layer.rgb[1]; b = layer.rgb[2]; a = 255; }
+                
+                if (showLayers) {
+                    for (let l = 0; l < queue.length; l++) {
+                        const layer = queue[l]; let isMatch = false;
+                        if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isMatch = true; }
+                        else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime') isMatch = isPrime(val); else if (layer.mode === 'square') isMatch = isSquare(val); else if (layer.mode === 'cube') isMatch = isCube(val); }
+                        if (isMatch) { r = layer.rgb[0]; g = layer.rgb[1]; b = layer.rgb[2]; a = 255; }
+                    }
                 }
+
                 if (manualEdits.has(manualIdx)) { if (a === 0) { r=255; g=255; b=255; a=255; } else { r=0; g=0; b=0; a=255; } }
                 if (a > 0) { data[pixelIndex] = r; data[pixelIndex+1] = g; data[pixelIndex+2] = b; data[pixelIndex+3] = a; count++; }
                 if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
@@ -528,19 +542,30 @@
         function toggleLife() { if (lifeInterval) pauseLife(); else if (isPaused) resumeLife(); else initLife(); }
         function initLife() {
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
-            const queue = []; layers.forEach(l => { if(l.visible) queue.push(l); }); queue.push({ ...current, rgb: currentRgb });
+            const showLayers = current.mode !== 'empty';
+            
+            const queue = []; 
+            if (showLayers) {
+                layers.forEach(l => { if(l.visible) queue.push(l); }); 
+                queue.push({ ...current, rgb: currentRgb });
+            }
+
             lifeGrid.fill(0);
             displayGrid.fill(0); // Reset Trail
             ageGrid.fill(0);     // Reset Age
             let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
             for (let i = 0; i < TOTAL_ITEMS; i++) {
                 let isAlive = 0;
-                for (let l = 0; l < queue.length; l++) {
-                    const layer = queue[l];
-                    if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isAlive = 1; }
-                    else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime' && isPrime(val)) isAlive = 1; else if (layer.mode === 'square' && isSquare(val)) isAlive = 1; else if (layer.mode === 'cube' && isCube(val)) isAlive = 1; }
-                    if (isAlive) break;
+                
+                if (showLayers) {
+                    for (let l = 0; l < queue.length; l++) {
+                        const layer = queue[l];
+                        if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isAlive = 1; }
+                        else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime' && isPrime(val)) isAlive = 1; else if (layer.mode === 'square' && isSquare(val)) isAlive = 1; else if (layer.mode === 'cube' && isCube(val)) isAlive = 1; }
+                        if (isAlive) break;
+                    }
                 }
+
                 const idx = (CY - y) * GRID_SIZE + (CX + x); if (manualEdits.has(idx)) isAlive = isAlive ? 0 : 1; lifeGrid[idx] = isAlive;
                 // Init extra grids
                 if (isAlive) {
