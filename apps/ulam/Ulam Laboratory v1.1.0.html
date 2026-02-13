@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ulam Laboratórium v2.3 (Fix)</title>
+    <title>Ulam Laboratórium v1.1.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -96,6 +96,40 @@
         .delete-all-btn:hover { background: #aa3333; }
 
         .helper-text { font-size: 0.7rem; color: #888; margin-top: 5px; font-style: italic; text-align: center; }
+
+        .bit-selector {
+            display: flex;
+            justify-content: space-between;
+            background: #222;
+            padding: 2px;
+            border-radius: 4px;
+        }
+        .bit-chk {
+            display: none; /* Rejtett checkbox */
+        }
+        .bit-label {
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            padding: 4px 0;
+            font-size: 0.8rem;
+            color: #666;
+            user-select: none;
+            transition: all 0.2s;
+            border-radius: 2px;
+        }
+        .bit-label:hover { background: #444; }
+        /* Ha be van pipálva a rejtett checkbox, a label stílusa változik */
+        .bit-chk:checked + .bit-label {
+            background: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        /* Külön szín a Survive-nak, hogy ne keverjük össze */
+        #surviveSelector .bit-chk:checked + .bit-label {
+            background: #28a745;
+        }
+
     </style>
 </head>
 <body>
@@ -141,14 +175,35 @@
 
         <div class="gol-section">
             <label>Életjáték Szabályok</label>
-            <select id="lifeRule">
+            <select id="lifeRule" onchange="toggleRuleEditor()">
                 <option value="life" selected>Game of Life (B3/S23)</option>
                 <option value="highlife">HighLife (B36/S23)</option>
                 <option value="daynight">Day & Night (B3678/S34678)</option>
                 <option value="seeds">Seeds (B2/S)</option>
                 <option value="diamoeba">Diamoeba (B35678/S5678)</option>
                 <option value="morley">Morley (B368/S245)</option>
+                <!-- ÚJ OPCIÓK -->
+                <option value="replicator">Replicator (B1357/S1357)</option>
+                <option value="walledcities">Walled Cities (B45678/S2345)</option>
+                <option value="stains">Stains (B3678/S235678)</option>
+                <option value="maze">Maze (B3/S12345)</option>
+                <option value="anneal">Anneal (B4678/S35678)</option>
+                <option value="custom" style="font-weight:bold; color:#ffcc00;">🛠️ Egyéni Szabály...</option>
             </select>
+
+            <!-- EGYÉNI SZABÁLY SZERKESZTŐ (Alapból rejtve) -->
+            <div id="customRuleEditor" style="display:none; background:#333; padding:8px; border-radius:4px; margin-top:5px; border:1px solid #555;">
+                <div style="font-size:0.75rem; color:#bbb; margin-bottom:4px;">SZÜLETÉS (Born): Hány szomszédnál?</div>
+                <div class="bit-selector" id="bornSelector">
+                    <!-- JS generálja majd -->
+                </div>
+                
+                <div style="font-size:0.75rem; color:#bbb; margin:6px 0 4px 0;">TÚLÉLÉS (Survive): Hány szomszédnál?</div>
+                <div class="bit-selector" id="surviveSelector">
+                    <!-- JS generálja majd -->
+                </div>
+                <div id="ruleNameDisplay" style="text-align:center; font-size:0.8rem; color:#00ffaa; margin-top:5px;">B3/S23</div>
+            </div>            
             <div class="gol-controls">
                 <button class="gol-btn" id="btnStart" onclick="toggleLife()" style="background: #28a745;">Start</button>
                 <button class="gol-btn" onclick="resetLife()" style="background: #17a2b8;">Reset</button>
@@ -326,6 +381,7 @@
             const queue = []; layers.forEach(l => { if(l.visible) queue.push(l); }); queue.push({ ...current, isPreview: true, rgb: currentRgb });
             const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
             let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            let count = 0;
             for (let i = 0; i < TOTAL_ITEMS; i++) {
                 const cx = CX + x; const cy = CY - y; const pixelIndex = (cy * GRID_SIZE + cx) * 4; const manualIdx = cy * GRID_SIZE + cx;
                 let r=0, g=0, b=0, a=0;
@@ -336,10 +392,11 @@
                     if (isMatch) { r = layer.rgb[0]; g = layer.rgb[1]; b = layer.rgb[2]; a = 255; }
                 }
                 if (manualEdits.has(manualIdx)) { if (a === 0) { r=255; g=255; b=255; a=255; } else { r=0; g=0; b=0; a=255; } }
-                if (a > 0) { data[pixelIndex] = r; data[pixelIndex+1] = g; data[pixelIndex+2] = b; data[pixelIndex+3] = a; }
+                if (a > 0) { data[pixelIndex] = r; data[pixelIndex+1] = g; data[pixelIndex+2] = b; data[pixelIndex+3] = a; count++; }
                 if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
             }
             ctx.putImageData(imgData, 0, 0); ctx.fillStyle = 'white'; ctx.fillRect(CX, CY, 1, 1);
+            countSpan.textContent = count.toLocaleString();
         }
 
         function toggleLife() { if (lifeInterval) pauseLife(); else if (isPaused) resumeLife(); else initLife(); }
@@ -365,21 +422,105 @@
         function resumeLife() { isPaused = false; btnStart.textContent = "Szünet"; btnStart.style.background = "#ffc107"; btnStart.style.color = "#000"; lifeInterval = setInterval(stepLife, 100); }
         function resetLife() { pauseLife(); isPaused = false; btnStart.textContent = "Start"; btnStart.style.background = "#28a745"; btnStart.style.color = "#fff"; render(); }
 
-        const LIFE_RULES = { life: { b: 1<<3, s: (1<<2)|(1<<3) }, highlife: { b: (1<<3)|(1<<6), s: (1<<2)|(1<<3) }, daynight: { b: (1<<3)|(1<<6)|(1<<7)|(1<<8), s: (1<<3)|(1<<4)|(1<<6)|(1<<7)|(1<<8) }, seeds: { b: 1<<2, s: 0 }, diamoeba: { b: (1<<3)|(1<<5)|(1<<6)|(1<<7)|(1<<8), s: (1<<5)|(1<<6)|(1<<7)|(1<<8) }, morley: { b: (1<<3)|(1<<6)|(1<<8), s: (1<<2)|(1<<4)|(1<<5) } };
+        const LIFE_RULES = {
+            life:           { b: 1<<3, s: (1<<2)|(1<<3) },
+            highlife:       { b: (1<<3)|(1<<6), s: (1<<2)|(1<<3) },
+            daynight:       { b: (1<<3)|(1<<6)|(1<<7)|(1<<8), s: (1<<3)|(1<<4)|(1<<6)|(1<<7)|(1<<8) },
+            seeds:          { b: 1<<2, s: 0 },
+            diamoeba:       { b: (1<<3)|(1<<5)|(1<<6)|(1<<7)|(1<<8), s: (1<<5)|(1<<6)|(1<<7)|(1<<8) },
+            morley:         { b: (1<<3)|(1<<6)|(1<<8), s: (1<<2)|(1<<4)|(1<<5) },
+            // Újak:
+            replicator:     { b: (1<<1)|(1<<3)|(1<<5)|(1<<7), s: (1<<1)|(1<<3)|(1<<5)|(1<<7) },
+            walledcities:   { b: (1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8), s: (1<<2)|(1<<3)|(1<<4)|(1<<5) },
+            stains:         { b: (1<<3)|(1<<6)|(1<<7)|(1<<8), s: (1<<2)|(1<<3)|(1<<5)|(1<<6)|(1<<7)|(1<<8) },
+            maze:           { b: 1<<3, s: (1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5) },
+            anneal:         { b: (1<<4)|(1<<6)|(1<<7)|(1<<8), s: (1<<3)|(1<<5)|(1<<6)|(1<<7)|(1<<8) }
+        };
+
+        // Init checkboxok generálása (0-tól 8-ig)
+        function initRuleEditor() {
+            const bSel = document.getElementById('bornSelector');
+            const sSel = document.getElementById('surviveSelector');
+            
+            for(let i=0; i<=8; i++) {
+                // Born
+                bSel.innerHTML += `
+                    <input type="checkbox" id="b${i}" class="bit-chk" onchange="updateRuleString()">
+                    <label for="b${i}" class="bit-label">${i}</label>
+                `;
+                // Survive
+                sSel.innerHTML += `
+                    <input type="checkbox" id="s${i}" class="bit-chk" onchange="updateRuleString()">
+                    <label for="s${i}" class="bit-label">${i}</label>
+                `;
+            }
+        }
+        // Hívjuk meg az oldal betöltésekor!
+        initRuleEditor();
+
+        function toggleRuleEditor() {
+            const val = document.getElementById('lifeRule').value;
+            const editor = document.getElementById('customRuleEditor');
+            
+            if (val === 'custom') {
+                editor.style.display = 'block';
+                // Ha customra váltunk, állítsuk be a checkboxokat a jelenlegi "Life" szabályra alapnak (opcionális)
+                // Vagy hagyjuk üresen. Most hagyjuk a felhasználóra.
+            } else {
+                editor.style.display = 'none';
+                // Ha visszaváltunk fix szabályra, állítsuk le a custom módot (a stepLife kezeli)
+            }
+        }
+
+        function updateRuleString() {
+            let bStr = "", sStr = "";
+            for(let i=0; i<=8; i++) {
+                if(document.getElementById(`b${i}`).checked) bStr += i;
+                if(document.getElementById(`s${i}`).checked) sStr += i;
+            }
+            document.getElementById('ruleNameDisplay').textContent = `B${bStr}/S${sStr}`;
+        }
+
+        // Segédfüggvény a Custom szabály kinyerésére
+        function getCustomRuleMasks() {
+            let b = 0, s = 0;
+            for(let i=0; i<=8; i++) {
+                if(document.getElementById(`b${i}`).checked) b |= (1 << i);
+                if(document.getElementById(`s${i}`).checked) s |= (1 << i);
+            }
+            return { b, s };
+        }
+
         function stepLife() {
-            const ruleKey = document.getElementById('lifeRule').value; const rule = LIFE_RULES[ruleKey] || LIFE_RULES.life;
+            const ruleKey = document.getElementById('lifeRule').value;
+            let rule;
+
+            if (ruleKey === 'custom') {
+                rule = getCustomRuleMasks(); // Checkboxokból olvassuk ki
+            } else {
+                rule = LIFE_RULES[ruleKey] || LIFE_RULES.life;
+            }
+            
             nextGrid.fill(0);
             for (let y = 1; y < GRID_SIZE - 1; y++) {
                 let rowOffset = y * GRID_SIZE;
                 for (let x = 1; x < GRID_SIZE - 1; x++) {
                     const idx = rowOffset + x;
                     let neighbors = lifeGrid[idx - GRID_SIZE - 1] + lifeGrid[idx - GRID_SIZE] + lifeGrid[idx - GRID_SIZE + 1] + lifeGrid[idx - 1] + lifeGrid[idx + 1] + lifeGrid[idx + GRID_SIZE - 1] + lifeGrid[idx + GRID_SIZE] + lifeGrid[idx + GRID_SIZE + 1];
+
                     const cell = lifeGrid[idx];
-                    if (cell === 1) { if ((rule.s >> neighbors) & 1) nextGrid[idx] = 1; } else { if ((rule.b >> neighbors) & 1) nextGrid[idx] = 1; }
+                    // Használjuk a maszkokat
+                    if (cell === 1) { 
+                        if ((rule.s >> neighbors) & 1) nextGrid[idx] = 1; 
+                    } else { 
+                        if ((rule.b >> neighbors) & 1) nextGrid[idx] = 1; 
+                    }
                 }
             }
+            // ... swap és renderelés ...
             let temp = lifeGrid; lifeGrid = nextGrid; nextGrid = temp; renderLifeFrame();
         }
+
         function renderLifeFrame() {
             const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
             const colorInput = document.getElementById('layerColor').value; const rgb = hexToRgb(colorInput);
