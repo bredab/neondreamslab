@@ -155,7 +155,7 @@
 
         canvas {
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            background-color: #eee;
+            background-color: #1a1a2e; /* Dark background to match app theme */
             cursor: crosshair;
         }
 
@@ -544,10 +544,11 @@
             // Draw background
             ctx.fillStyle = color;
             // Use simple fillRect without rounding for high performance on large grids
-            // Add a tiny gap for grid effect if grid is small enough
-            const gap = GRID_SIZE <= 50 ? 1 : 0;
+            // Add a tiny gap (minimum 1px) for grid effect
+            const gap = 1; 
             ctx.fillRect(x, y, cellSize - gap, cellSize - gap);
             
+            // Sqrt Marker Border
             // Sqrt Marker Border
             if (i === Math.floor(Math.sqrt(MAX_NUMBER))) {
                 ctx.lineWidth = GRID_SIZE > 100 ? 1 : 3;
@@ -571,7 +572,10 @@
         }
 
         function drawGrid() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Clear with dark background color to ensure gaps are visible
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
             // Redraw everything
             // Note: For 1M cells, this loop is fast enough in JS (~10-20ms)
             for (let i = 1; i <= MAX_NUMBER; i++) {
@@ -702,27 +706,32 @@
             playSound('prime');
             statusDiv.textContent = `Sieving multiples of ${currentPrime}...`;
 
-            // Calculate Dynamic Speed for ~10s Total Duration
-            // Steps remaining ~ Sum(MAX/p) for p > current. Roughly N * log(log(N)).
-            // But we only care about THIS wave's speed.
-            // If we want total time = 10s.
-            // Let's approximate: 
-            // Total operations ~ MAX_NUMBER.
-            // Operations in this wave = MAX_NUMBER / currentPrime.
-            // Fraction of work = (MAX/p) / MAX = 1/p.
-            // Time alloc for this wave = TotalTime * (1/p) / Sum(1/q) ?? Too complex.
+            // Calculate Dynamic Speed
+            // Goal: The sieving process up to sqrt(N) should take ~10 seconds.
+            // We need to estimate how much work is left.
+            // Work remaining ~ Sum(MAX/p) for p from currentPrime to sqrt(MAX).
+            // This is roughly MAX * (log(log(sqrt(MAX))) - log(log(currentPrime))).
+            //
+            // Let's stick to a simpler heuristic that adapts frame by frame.
+            // We want to process roughly `MAX_NUMBER * log(log(MAX))` operations total in 10s.
+            // But user specifically asked for "finding primes up to sqrt(n) takes ~10s".
             
-            // Simpler heuristic:
-            // We want to process `MAX_NUMBER` items in `TARGET_DURATION_MS`.
-            // So roughly `TARGET_DURATION_MS / MAX_NUMBER` ms per item.
-            // For 100x100 (10,000 items) -> 10,000ms / 10,000 = 1ms per item.
-            // For 1000x1000 (1M items) -> 10,000ms / 1M = 0.01ms per item.
+            // Let's estimate total operations for sieving up to sqrt(N):
+            // Ops ~ N * log(log(sqrt(N)))
+            // Total Time = 10000ms
+            // Time per Op = 10000 / Ops
             
-            let msPerItem = TARGET_DURATION_MS / MAX_NUMBER;
+            // Calculating N * log(log(sqrt(N)))
+            const limit = Math.sqrt(MAX_NUMBER);
+            const totalOpsApprox = MAX_NUMBER * Math.log(Math.log(limit));
+            
+            let msPerItem = TARGET_DURATION_MS / totalOpsApprox;
+            
+            // Safety check for small N
+            if (!isFinite(msPerItem) || msPerItem < 0.001) msPerItem = 0.001;
             
             // Adjust for overhead. Drawing takes time.
             // If msPerItem < 4ms (framerate limit ~16ms), we must batch.
-            // Batch size = 16ms / msPerItem.
             
             let batchSize = 1;
             let delay = msPerItem;
@@ -735,7 +744,7 @@
             }
             
             // Cap batch size to avoid freezing
-            if (batchSize > 5000) batchSize = 5000;
+            if (batchSize > 10000) batchSize = 10000;
 
             // 2. Start the WAVE
             let count = 0;
