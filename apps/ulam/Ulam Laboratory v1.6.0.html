@@ -250,19 +250,6 @@
             </div>
         </div>
 
-        <!-- SECTION 1.5: RAJZESZKÖZÖK -->
-        <div class="control-section">
-            <div class="section-header" onclick="toggleSection(this)">Rajzeszközök <span class="arrow">▼</span></div>
-            <div class="section-content">
-                <div class="drawing-tools">
-                    <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')" title="Ceruza (Shift+Klikk)">✏️</button>
-                    <button class="tool-btn" id="tool-square" onclick="setTool('square')" title="Téglalap">⬜</button>
-                    <button class="tool-btn" id="tool-line" onclick="setTool('line')" title="Szakasz">📏</button>
-                    <button class="tool-btn" id="tool-circle" onclick="setTool('circle')" title="Kör">⭕</button>
-                </div>
-            </div>
-        </div>
-
         <!-- SECTION 2: ULAM PARAMÉTEREK -->
         <div class="control-section">
             <div class="section-header" onclick="toggleSection(this)">Ulam Paraméterek <span class="arrow">▼</span></div>
@@ -342,6 +329,20 @@
                     <button class="gol-btn" onclick="resetLife()" style="background: #17a2b8;">Reset</button>
                 </div>
                 <button class="gol-btn" onclick="clearScreen()" style="background: #d63384; margin-top:5px; width:100%;">Törlés (Clear)</button>
+            </div>
+        </div>
+
+        <!-- SECTION 4.5: RAJZESZKÖZÖK (Áthelyezve) -->
+        <div class="control-section">
+            <div class="section-header" onclick="toggleSection(this)">Rajzeszközök <span class="arrow">▼</span></div>
+            <div class="section-content">
+                <div class="drawing-tools">
+                    <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')" title="Ceruza (Shift+Klikk)">✏️</button>
+                    <button class="tool-btn" id="tool-square" onclick="setTool('square')" title="Téglalap">⬜</button>
+                    <button class="tool-btn" id="tool-line" onclick="setTool('line')" title="Szakasz">📏</button>
+                    <button class="tool-btn" id="tool-circle" onclick="setTool('circle')" title="Kör">⭕</button>
+                </div>
+                <div class="helper-text" style="margin-top:8px;">SHIFT nyomvatartása mellett rajzolhatsz a vászonra.</div>
             </div>
         </div>
 
@@ -523,27 +524,6 @@
         // 1. Mouse Down
         container.addEventListener('mousedown', (e) => { 
             if (e.button !== 0) return; // Csak bal klikk
-
-            // Ha Shift-et nyom, az mindig "Pencil" módnak tekinthető gyorsszerkesztéshez,
-            // de most a Tool rendszer veszi át az irányítást.
-            // A régi logika: if (e.shiftKey) ...
-            // Az új logika: Ha 'pencil' tool VAGY ShiftKey -> Rajzolás.
-            // De ha Shape tool van kiválasztva, akkor ShiftKey mit csináljon?
-            // Hagyjuk meg a ShiftKey-t mint "Ideiglenes Ceruza" vagy csak hagyatkozzunk a Tool-ra?
-            // A felhasználó kérte a paneleket.
-            // Legyen: Ha ShiftKey van, az mindig Pencil rajzolás.
-            // Ha nincs ShiftKey, akkor a kiválasztott Tool működik (kivéve ha Panning lenne?)
-            // A Panning konfliktusban van a Shape drawing-gal (mindkettő sima klikk).
-            // Panning legyen: Space + Drag, vagy Middle Click, vagy ha a Tool "Move"?
-            // Vagy: Ha Shift van, az rajzol. Ha nincs Shift, az Pan?
-            // A felhasználó "kézi rajz (ahogy most működik)"-t kért. Most Shift+Click a rajz.
-            // Tehát a Tool-ok aktiválásához Shift kell? Vagy a Tool módosítja a viselkedést?
-            
-            // Javaslat:
-            // - Panning: Bal klikk (ha NEM Tool módban vagyunk?) Vagy Middle klikk?
-            // - Jelenleg: Bal klikk (no shift) = Pan. Shift+Bal = Draw.
-            // - Ha "Square" tool van, akkor Shift+Bal = Square Draw?
-            // - Ez logikus lenne. A Shift "aktiválja" a szerkesztést.
             
             if (e.shiftKey) {
                 isDrawing = true;
@@ -686,12 +666,13 @@
                 }
             }
             else if (currentTool === 'circle') {
-                // Circle from center (x0,y0) to perimeter (x1,y1) -> radius
                 const r = Math.sqrt((x1-x0)**2 + (y1-y0)**2);
                 const rCeil = Math.ceil(r);
                 for (let y = y0 - rCeil; y <= y0 + rCeil; y++) {
                     for (let x = x0 - rCeil; x <= x0 + rCeil; x++) {
-                        if (Math.sqrt((x-x0)**2 + (y-y0)**2) <= r) {
+                        const dist = Math.sqrt((x-x0)**2 + (y-y0)**2);
+                        // Outline logic: distance approx radius (within 0.8px)
+                        if (Math.abs(dist - r) < 0.8) {
                             if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
                                 previewPixels.set(y * GRID_SIZE + x, 1);
                             }
@@ -827,6 +808,8 @@
             anneal:         { b: (1<<4)|(1<<6)|(1<<7)|(1<<8), s: (1<<3)|(1<<5)|(1<<6)|(1<<7)|(1<<8) }
         };
 
+        let lastLifeRule = 'life';
+
         // Init checkboxok generálása (0-tól 8-ig)
         function initRuleEditor() {
             const bSel = document.getElementById('bornSelector');
@@ -854,11 +837,16 @@
             
             if (val === 'custom') {
                 editor.style.display = 'block';
-                // Ha customra váltunk, állítsuk be a checkboxokat a jelenlegi "Life" szabályra alapnak (opcionális)
-                // Vagy hagyjuk üresen. Most hagyjuk a felhasználóra.
+                // Betöltjük az előző szabály beállításait alapnak
+                const rule = LIFE_RULES[lastLifeRule] || LIFE_RULES.life;
+                for(let i=0; i<=8; i++) {
+                    document.getElementById(`b${i}`).checked = (rule.b >> i) & 1;
+                    document.getElementById(`s${i}`).checked = (rule.s >> i) & 1;
+                }
+                updateRuleString();
             } else {
                 editor.style.display = 'none';
-                // Ha visszaváltunk fix szabályra, állítsuk le a custom módot (a stepLife kezeli)
+                lastLifeRule = val;
             }
         }
 
@@ -953,25 +941,9 @@
                 else if (mode === 'trail') {
                     const val = displayGrid[i];
                     if (val > 1) { // Csak ha látható
-                        // Színátmenet: BaseColor -> ... -> Black
-                        // Egyszerűsített: BaseColor sötétítése
-                        // A kérés: sárga -> vörös -> sötétlila -> fekete
-                        // Ehhez HSL jobb lenne, vagy egy trükkös RGB keverés.
-                        // Használjunk egy egyszerű intenzitás alapú sötétítést a választott színből.
-                        // Vagy ha sárga (255,255,0), akkor csökkentsük a Zöldet gyorsabban, hogy Vörös legyen?
-                        
+                       
                         const intensity = val / 255;
-                        
-                        // Egyedi "tűz" effektus generálása a bázis színből
-                        // Ha a bázis szín világos (pl Sárga), akkor vörösbe hajlik.
-                        // Ha Kék, akkor sötétkékbe.
-                        
-                        // Próbáljuk megvalósítani a kért átmenetet a sárga példa alapján általánosan:
-                        // "Heat map" szerű színezés.
-                        
-                        // De tartsuk tiszteletben a felhasználó színválasztását?
-                        // "A 255-ös érték a kiválasztott 'Élő' szín."
-                        
+                       
                         r = baseRgb[0] * intensity;
                         g = baseRgb[1] * (intensity * intensity); // Gyorsabb sötétedés = szín eltolódás
                         b = baseRgb[2] * (intensity * intensity * intensity);
