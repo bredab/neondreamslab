@@ -607,7 +607,11 @@
 
                 // Move wave front
                 highlightCell(i, 'scan');
-                await new Promise(r => setTimeout(r, 100)); // Animation speed
+                
+                // Dynamic delay: 100ms for 10x10, down to 10ms for 30x30
+                const delay = 145 - (4.5 * GRID_SIZE);
+                await new Promise(r => setTimeout(r, delay)); 
+                
                 highlightCell(i, 'unscan');
 
                 // Flip bit
