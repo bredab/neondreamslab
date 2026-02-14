@@ -75,6 +75,26 @@
             gap: 10px;
             align-items: center;
         }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .slider-btn {
+            padding: 5px 10px;
+            font-size: 18px;
+            line-height: 1;
+            width: 40px; 
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%; /* Round buttons */
+            flex-shrink: 0;
+        }
 
         input[type="number"] {
             background: #0f3460;
@@ -267,7 +287,11 @@
             <!-- Grid Size Slider -->
             <div class="control-group">
                 <label for="sizeSlider">Grid Size: <span id="sizeLabel" style="color: #2ecc71; font-weight: bold;">10x10 (100)</span></label>
-                <input type="range" id="sizeSlider" min="10" max="1000" step="1" value="10" style="width: 100%; cursor: pointer;">
+                <div class="slider-container">
+                    <button id="btnGridMinus" class="slider-btn">-</button>
+                    <input type="range" id="sizeSlider" min="10" max="1000" step="1" value="10" style="width: 100%; cursor: pointer;">
+                    <button id="btnGridPlus" class="slider-btn">+</button>
+                </div>
             </div>
 
             <!-- Sound Toggle -->
@@ -315,6 +339,8 @@
         const sizeSlider = document.getElementById('sizeSlider');
         const sizeLabel = document.getElementById('sizeLabel');
         const soundToggle = document.getElementById('soundToggle');
+        const btnGridMinus = document.getElementById('btnGridMinus');
+        const btnGridPlus = document.getElementById('btnGridPlus');
         
         let numbers = []; // true if potentially prime
         let cellStates = []; // 0: unknown, 1: prime, 2: composite, 3: scanning
@@ -324,6 +350,9 @@
         let audioCtx = null;
         let cellSize = 0;
         let canvasWidth, canvasHeight;
+        
+        // Target duration for the whole animation in milliseconds
+        const TARGET_DURATION_MS = 10000; 
 
         // Constants for colors
         const COLOR_UNKNOWN = '#eeeeee';
@@ -377,8 +406,12 @@
         }
 
         // Slider Event Listener
-        sizeSlider.oninput = function() {
-            GRID_SIZE = parseInt(this.value);
+        function updateGridSize(newSize) {
+            // Clamp value
+            newSize = Math.max(parseInt(sizeSlider.min), Math.min(newSize, parseInt(sizeSlider.max)));
+            
+            sizeSlider.value = newSize;
+            GRID_SIZE = newSize;
             MAX_NUMBER = GRID_SIZE * GRID_SIZE;
             sizeLabel.textContent = `${GRID_SIZE}x${GRID_SIZE} (${MAX_NUMBER})`;
             
@@ -391,6 +424,18 @@
             statusDiv.textContent = "Grid resized.";
             
             initGrid();
+        }
+
+        sizeSlider.oninput = function() {
+            updateGridSize(parseInt(this.value));
+        };
+
+        btnGridMinus.onclick = function() {
+            updateGridSize(GRID_SIZE - 1);
+        };
+
+        btnGridPlus.onclick = function() {
+            updateGridSize(GRID_SIZE + 1);
         };
 
         // Grid initialization
@@ -401,7 +446,9 @@
             numbers[0] = 0;
             numbers[1] = 0;
             
-            resizeCanvas();
+            // Note: resizeCanvas is called here, but we also need to call it if window resizes
+            // AND we need to update max grid size based on canvas size
+            resizeCanvas(); 
             drawGrid();
         }
 
@@ -414,12 +461,26 @@
             const size = Math.min(maxWidth, maxHeight);
             
             // Set canvas resolution
-            // Use 2x for retina displays if needed, but for performance on 1000x1000 grid, 1x is safer
             canvas.width = size;
             canvas.height = size;
-            
             canvasWidth = size;
             canvasHeight = size;
+            
+            // Calculate Max Grid Size: 1px cell + 1px gap = 2px minimum per cell
+            const maxGridSize = Math.floor(size / 2);
+            
+            // Update slider max
+            sizeSlider.max = maxGridSize;
+            
+            // If current grid size exceeds max, clamp it
+            if (GRID_SIZE > maxGridSize) {
+                updateGridSize(maxGridSize);
+                // updateGridSize calls initGrid -> resizeCanvas (potential loop, but blocked by GRID_SIZE check)
+                // Actually updateGridSize calls initGrid which calls resizeCanvas.
+                // We need to be careful not to infinite loop.
+                // The check `if (GRID_SIZE > maxGridSize)` prevents loop because updateGridSize sets it to maxGridSize.
+                return; 
+            }
             
             cellSize = size / GRID_SIZE;
         }
@@ -591,7 +652,6 @@
             document.getElementById('btnNext').disabled = true;
 
             // 1. Find the next 1 bit (Prime)
-            let foundNext = false;
             
             // Optimization: If the next candidate prime is greater than sqrt(MAX_NUMBER),
             // then all remaining unmarked numbers are prime.
@@ -609,7 +669,7 @@
                 statusDiv.textContent = "Done! All primes found.";
                 playSound('done');
                 isAnimating = false;
-                stopAutoPlay(); // Ensure auto-play stops
+                stopAutoPlay(); 
                 return;
             }
 
@@ -642,40 +702,77 @@
             playSound('prime');
             statusDiv.textContent = `Sieving multiples of ${currentPrime}...`;
 
-            // Wait a bit (less for huge grids)
-            if (GRID_SIZE <= 50) {
-                await new Promise(r => setTimeout(r, 500));
+            // Calculate Dynamic Speed for ~10s Total Duration
+            // Steps remaining ~ Sum(MAX/p) for p > current. Roughly N * log(log(N)).
+            // But we only care about THIS wave's speed.
+            // If we want total time = 10s.
+            // Let's approximate: 
+            // Total operations ~ MAX_NUMBER.
+            // Operations in this wave = MAX_NUMBER / currentPrime.
+            // Fraction of work = (MAX/p) / MAX = 1/p.
+            // Time alloc for this wave = TotalTime * (1/p) / Sum(1/q) ?? Too complex.
+            
+            // Simpler heuristic:
+            // We want to process `MAX_NUMBER` items in `TARGET_DURATION_MS`.
+            // So roughly `TARGET_DURATION_MS / MAX_NUMBER` ms per item.
+            // For 100x100 (10,000 items) -> 10,000ms / 10,000 = 1ms per item.
+            // For 1000x1000 (1M items) -> 10,000ms / 1M = 0.01ms per item.
+            
+            let msPerItem = TARGET_DURATION_MS / MAX_NUMBER;
+            
+            // Adjust for overhead. Drawing takes time.
+            // If msPerItem < 4ms (framerate limit ~16ms), we must batch.
+            // Batch size = 16ms / msPerItem.
+            
+            let batchSize = 1;
+            let delay = msPerItem;
+            
+            if (msPerItem < 4) {
+                delay = 0; // Run as fast as possible in batches
+                // Calculate how many items to process per 16ms frame to keep up
+                // items_per_frame = 16 / msPerItem
+                batchSize = Math.ceil(16 / msPerItem);
             }
+            
+            // Cap batch size to avoid freezing
+            if (batchSize > 5000) batchSize = 5000;
 
             // 2. Start the WAVE
+            let count = 0;
             
-            // Dynamic animation skipping for performance
-            // If grid is huge, skip animation frames
-            const skipAnimation = GRID_SIZE > 100;
-            
+            // If we are batching, we skip the yellow "scan" animation for individual cells
+            // to save redraw time, just showing the red composite hits.
+            const showScan = batchSize === 1;
+
             for (let i = currentPrime * 2; i <= MAX_NUMBER; i += currentPrime) {
                 if (!isAutoPlaying && !isAnimating) break; 
 
-                if (!skipAnimation) {
+                if (showScan) {
                     updateCellState(i, 3); // Scanning
-                    
-                    // Dynamic delay
-                    const delay = Math.max(0, 145 - (4.5 * GRID_SIZE));
                     if (delay > 0) await new Promise(r => setTimeout(r, delay)); 
-                    
-                    // Revert scan state immediately before setting real state
-                    // (Actually we don't need to revert if we overwrite with composite next)
                 }
 
                 if (numbers[i]) { 
-                     if (!skipAnimation) playSound('composite');
+                     // Only play sound occasionally if fast
+                     if (delay > 50) playSound('composite'); 
+                     
                      numbers[i] = 0; // False
-                     updateCellState(i, 2); // Composite
+                     cellStates[i] = 2; // Composite state
+                     // If batching, we don't draw immediately
+                     if (batchSize === 1) drawCell(i);
                 } else {
-                     // Was already composite, revert scan
-                     if (!skipAnimation) updateCellState(i, 2);
+                     if (showScan) updateCellState(i, 2); // Revert scan
+                }
+                
+                count++;
+                if (batchSize > 1 && count % batchSize === 0) {
+                    drawGrid(); // Draw the batch
+                    await new Promise(r => setTimeout(r, 0)); // Yield to UI
                 }
             }
+            
+            // Final draw for any remaining in batch
+            if (batchSize > 1) drawGrid();
 
             currentPrime++;
             isAnimating = false;
