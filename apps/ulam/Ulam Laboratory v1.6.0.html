@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ulam Laboratórium v1.5.0</title>
+    <title>Ulam Laboratórium v1.6.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -205,18 +205,36 @@
             background: #28a745;
         }
 
+        /* Drawing Tools */
+        .drawing-tools { display: flex; gap: 5px; justify-content: space-between; }
+        .tool-btn {
+            flex: 1;
+            background: #333;
+            border: 1px solid #555;
+            color: #eee;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover { background: #444; }
+        .tool-btn.active {
+            background: #007bff;
+            border-color: #0056b3;
+            color: white;
+            box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+        }
+
     </style>
 </head>
 <body>
 
-    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Vezérlőpanel elrejtése/megjelenítése">
-        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-    </button>
-
     <div class="controls" id="sidebar">
         
         <div style="padding: 15px; border-bottom: 1px solid #444; background: #252525;">
-            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.5.0</small></h2>
+            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.6.0</small></h2>
         </div>
 
         <!-- SECTION 1: KURZOR & INFÓ -->
@@ -228,6 +246,19 @@
                     <div class="info-row"><span class="info-label">Index:</span> <span class="info-val" id="infoIdx">-</span></div>
                     <div style="font-size:0.75rem; color:#888; margin-top:5px;">Számérték (Szekvencia):</div>
                     <div class="info-big" id="infoVal">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 1.5: RAJZESZKÖZÖK -->
+        <div class="control-section">
+            <div class="section-header" onclick="toggleSection(this)">Rajzeszközök <span class="arrow">▼</span></div>
+            <div class="section-content">
+                <div class="drawing-tools">
+                    <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')" title="Ceruza (Shift+Klikk)">✏️</button>
+                    <button class="tool-btn" id="tool-square" onclick="setTool('square')" title="Téglalap">⬜</button>
+                    <button class="tool-btn" id="tool-line" onclick="setTool('line')" title="Szakasz">📏</button>
+                    <button class="tool-btn" id="tool-circle" onclick="setTool('circle')" title="Kör">⭕</button>
                 </div>
             </div>
         </div>
@@ -335,6 +366,10 @@
 
     </div>
 
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Vezérlőpanel elrejtése/megjelenítése">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+
     <div class="canvas-container">
         <canvas id="ulamCanvas" width="1001" height="1001"></canvas>
         <div class="canvas-controls">
@@ -371,6 +406,12 @@
         let ageGrid = new Uint32Array(TOTAL_ITEMS);      // Életkor tárolásához
         let scale = 1, translateX = 0, translateY = 0;
         let panning = false, startX = 0, startY = 0;
+
+        // RAJZOLÁS ÁLLAPOT
+        let currentTool = 'pencil';
+        let isDrawing = false;
+        let shapeStart = null; // {x, y}
+        let previewPixels = new Map(); // index -> 1
 
         // --- MATEMATIKA ---
         function isPrime(num) {
@@ -477,15 +518,100 @@
         function deleteAllLayers() { if (confirm("Biztosan törölsz mindent?")) { layers = []; manualEdits.clear(); resetLife(); updateLayerListUI(); } }
         function saveImage() { const link = document.createElement('a'); link.download = 'ulam_spiral.png'; link.href = canvas.toDataURL(); link.click(); }
 
-        // --- ESEMÉNYKEZELÉS ---
-        let isDrawing = false;
-        container.addEventListener('mousedown', (e) => { if (e.shiftKey && e.button === 0) { isDrawing = true; handleEdit(e); } });
-        container.addEventListener('mousemove', (e) => { updateStatusPanel(e); if (isDrawing && e.shiftKey) handleEdit(e); });
-        container.addEventListener('mouseleave', () => resetStatusPanel());
+        // --- ESEMÉNYKEZELÉS (ÚJRAGONDOLVA) ---
         
-        container.addEventListener('mousedown', (e) => { if (!e.shiftKey && e.button === 0) { panning = true; startX = e.clientX - translateX; startY = e.clientY - translateY; container.style.cursor = "grabbing"; } });
-        window.addEventListener('mouseup', () => { isDrawing = false; panning = false; container.style.cursor = "crosshair"; });
-        window.addEventListener('mousemove', (e) => { if (panning) { e.preventDefault(); translateX = e.clientX - startX; translateY = e.clientY - startY; applyTransform(); } });
+        // 1. Mouse Down
+        container.addEventListener('mousedown', (e) => { 
+            if (e.button !== 0) return; // Csak bal klikk
+
+            // Ha Shift-et nyom, az mindig "Pencil" módnak tekinthető gyorsszerkesztéshez,
+            // de most a Tool rendszer veszi át az irányítást.
+            // A régi logika: if (e.shiftKey) ...
+            // Az új logika: Ha 'pencil' tool VAGY ShiftKey -> Rajzolás.
+            // De ha Shape tool van kiválasztva, akkor ShiftKey mit csináljon?
+            // Hagyjuk meg a ShiftKey-t mint "Ideiglenes Ceruza" vagy csak hagyatkozzunk a Tool-ra?
+            // A felhasználó kérte a paneleket.
+            // Legyen: Ha ShiftKey van, az mindig Pencil rajzolás.
+            // Ha nincs ShiftKey, akkor a kiválasztott Tool működik (kivéve ha Panning lenne?)
+            // A Panning konfliktusban van a Shape drawing-gal (mindkettő sima klikk).
+            // Panning legyen: Space + Drag, vagy Middle Click, vagy ha a Tool "Move"?
+            // Vagy: Ha Shift van, az rajzol. Ha nincs Shift, az Pan?
+            // A felhasználó "kézi rajz (ahogy most működik)"-t kért. Most Shift+Click a rajz.
+            // Tehát a Tool-ok aktiválásához Shift kell? Vagy a Tool módosítja a viselkedést?
+            
+            // Javaslat:
+            // - Panning: Bal klikk (ha NEM Tool módban vagyunk?) Vagy Middle klikk?
+            // - Jelenleg: Bal klikk (no shift) = Pan. Shift+Bal = Draw.
+            // - Ha "Square" tool van, akkor Shift+Bal = Square Draw?
+            // - Ez logikus lenne. A Shift "aktiválja" a szerkesztést.
+            
+            if (e.shiftKey) {
+                isDrawing = true;
+                const pos = getCanvasCoordinates(e);
+                if (!pos.valid) { isDrawing = false; return; }
+
+                if (currentTool === 'pencil') {
+                    handlePencil(pos);
+                } else {
+                    // Shape start
+                    shapeStart = pos;
+                    previewPixels.clear();
+                }
+            } else {
+                // Panning
+                panning = true; 
+                startX = e.clientX - translateX; 
+                startY = e.clientY - translateY; 
+                container.style.cursor = "grabbing";
+            }
+        });
+
+        // 2. Mouse Move
+        window.addEventListener('mousemove', (e) => { 
+            updateStatusPanel(e);
+            
+            if (panning) { 
+                e.preventDefault(); 
+                translateX = e.clientX - startX; 
+                translateY = e.clientY - startY; 
+                applyTransform(); 
+                return;
+            }
+
+            if (isDrawing && e.shiftKey) { // Csak ha Shift még nyomva van (biztonság)
+                const pos = getCanvasCoordinates(e);
+                if (!pos.valid) return;
+
+                if (currentTool === 'pencil') {
+                    handlePencil(pos);
+                } else {
+                    // Shape Preview
+                    calculateShapePreview(pos);
+                    render(); // Újrarajzolás preview-val
+                }
+            }
+        });
+
+        // 3. Mouse Up
+        window.addEventListener('mouseup', () => { 
+            if (isDrawing && currentTool !== 'pencil' && shapeStart) {
+                // Commit Shape
+                commitShape();
+                render();
+            }
+            
+            isDrawing = false; 
+            panning = false; 
+            shapeStart = null;
+            previewPixels.clear();
+            container.style.cursor = "crosshair"; 
+            
+            // Ha volt preview, el kell tűntetni (ha a commitShape nem hívott render-t)
+            // De commitShape hívott. Ha mégse (pl. érvénytelen), akkor renderelni kell, hogy eltűnjön a preview.
+            // Biztonságból renderelhetünk, ha volt shapeStart.
+        });
+        
+        container.addEventListener('mouseleave', () => resetStatusPanel());
 
         function resetStatusPanel() { infoPos.textContent = "-"; infoIdx.textContent = "-"; infoVal.textContent = "-"; }
         function updateStatusPanel(e) {
@@ -499,19 +625,100 @@
             } else { resetStatusPanel(); }
         }
 
-        function handleEdit(e) {
-            const pos = getCanvasCoordinates(e);
-            if (!pos.valid) return;
+        // Eszköz választás
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tool-' + tool).classList.add('active');
+        }
+
+        function handlePencil(pos) {
             const idx = pos.y * GRID_SIZE + pos.x;
-            if (lifeInterval || isPaused) { lifeGrid[idx] = lifeGrid[idx] ? 0 : 1; if (isPaused) renderLifeFrame(); }
-            else { if (manualEdits.has(idx)) manualEdits.delete(idx); else manualEdits.set(idx, 1); render(); }
+            if (lifeInterval || isPaused) { 
+                lifeGrid[idx] = lifeGrid[idx] ? 0 : 1; 
+                if (isPaused) renderLifeFrame(); 
+            } else { 
+                if (manualEdits.has(idx)) manualEdits.delete(idx); else manualEdits.set(idx, 1); 
+                render(); 
+            }
+        }
+
+        function calculateShapePreview(endPos) {
+            previewPixels.clear();
+            if (!shapeStart) return;
+
+            const x0 = shapeStart.x; const y0 = shapeStart.y;
+            const x1 = endPos.x; const y1 = endPos.y;
+
+            if (currentTool === 'line') {
+                // Bresenham line
+                let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+                let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+                let err = dx + dy, e2;
+                let cx = x0, cy = y0;
+                while (true) {
+                    if (cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE) {
+                        previewPixels.set(cy * GRID_SIZE + cx, 1);
+                    }
+                    if (cx === x1 && cy === y1) break;
+                    e2 = 2 * err;
+                    if (e2 >= dy) { err += dy; cx += sx; }
+                    if (e2 <= dx) { err += dx; cy += sy; }
+                }
+            } 
+            else if (currentTool === 'square') {
+                const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+                const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+                
+                // Top & Bottom
+                for (let x = minX; x <= maxX; x++) {
+                    if (x >= 0 && x < GRID_SIZE) {
+                        if (minY >= 0 && minY < GRID_SIZE) previewPixels.set(minY * GRID_SIZE + x, 1);
+                        if (maxY >= 0 && maxY < GRID_SIZE) previewPixels.set(maxY * GRID_SIZE + x, 1);
+                    }
+                }
+                // Left & Right
+                for (let y = minY; y <= maxY; y++) {
+                    if (y >= 0 && y < GRID_SIZE) {
+                        if (minX >= 0 && minX < GRID_SIZE) previewPixels.set(y * GRID_SIZE + minX, 1);
+                        if (maxX >= 0 && maxX < GRID_SIZE) previewPixels.set(y * GRID_SIZE + maxX, 1);
+                    }
+                }
+            }
+            else if (currentTool === 'circle') {
+                // Circle from center (x0,y0) to perimeter (x1,y1) -> radius
+                const r = Math.sqrt((x1-x0)**2 + (y1-y0)**2);
+                const rCeil = Math.ceil(r);
+                for (let y = y0 - rCeil; y <= y0 + rCeil; y++) {
+                    for (let x = x0 - rCeil; x <= x0 + rCeil; x++) {
+                        if (Math.sqrt((x-x0)**2 + (y-y0)**2) <= r) {
+                            if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+                                previewPixels.set(y * GRID_SIZE + x, 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function commitShape() {
+            // Apply previewPixels to manualEdits (or lifeGrid)
+            if (lifeInterval || isPaused) {
+                previewPixels.forEach((_, idx) => {
+                    lifeGrid[idx] = 1; // Always ADD shape to life
+                });
+                if (isPaused) renderLifeFrame();
+            } else {
+                previewPixels.forEach((_, idx) => {
+                    manualEdits.set(idx, 1); // Always ADD shape
+                });
+            }
         }
 
         function render() {
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
             const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
             
-            // Ha 'empty' mód van kiválasztva, nem rajzoljuk ki a rétegeket, csak a kézi módosításokat
             const showLayers = current.mode !== 'empty';
             const queue = []; 
             
@@ -536,6 +743,13 @@
                 }
 
                 if (manualEdits.has(manualIdx)) { if (a === 0) { r=255; g=255; b=255; a=255; } else { r=0; g=0; b=0; a=255; } }
+                
+                // PREVIEW LAYER
+                if (previewPixels.has(manualIdx)) {
+                    // Zöld szín a preview-hoz
+                    r = 0; g = 255; b = 0; a = 255;
+                }
+
                 if (a > 0) { data[pixelIndex] = r; data[pixelIndex+1] = g; data[pixelIndex+2] = b; data[pixelIndex+3] = a; count++; }
                 if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
             }
@@ -593,46 +807,9 @@
             lifeGrid.fill(0);
             displayGrid.fill(0);
             ageGrid.fill(0);
-            manualEdits.clear(); // A kézi szerkesztéseket is töröljük
+            manualEdits.clear();
             
-            // Ha Ulam módban vagyunk (nincs lifeGrid renderelve?), akkor a render() hívás kirajzolja az Ulam spirált.
-            // De a felhasználó "teljesen üres" képet akar.
-            // Ha Ulam rétegek vannak, azok kirajzolódnak.
-            // A "Törlés" gomb a Game of Life szekcióban van.
-            // Valószínűleg az Életjáték állapotát akarja törölni (üres rács).
-            // De ha rétegek vannak, azok "újragenerálják" az életet a Start-nál?
-            // A "resetLife" visszatér az Ulam nézethez.
-            // A "clearScreen" legyen az, hogy:
-            // 1. Megállít.
-            // 2. Ürít mindent (lifeGrid = 0).
-            // 3. Renderel egy ÜRES life frame-et (fekete képernyő).
-            
-            // De ha render()-t hívok, az kirajzolja a spirált.
-            // Ha renderLifeFrame()-t hívok üres ráccsal, az fekete.
             renderLifeFrame();
-            
-            // Fontos: Ha a felhasználó ezután Start-ot nyom, az `initLife` lefut, és ÚJRATÖLTI a spirált!
-            // Tehát ha "üresről" akar indulni, akkor a rétegeket ki kell kapcsolni?
-            // Vagy `initLife` ne töltsön be semmit?
-            // A `toggleLife` hívja az `initLife`-ot.
-            // Megoldás: A `clearScreen` ne csak rendereljen, hanem jelezze, hogy "tiszta lappal" indulunk.
-            // De az `initLife` logika: `layers.forEach...`.
-            // Ha a felhasználó manuálisan rajzolni akar egy üres rácsra, akkor az `initLife` bekavar.
-            
-            // Módosítsuk az `initLife`-ot, hogy csak akkor töltsön be, ha NEM volt clear?
-            // Vagy egyszerűen: A `clearScreen` törli a `layers`-t is? Nem, az drasztikus.
-            // A `deleteAllLayers` már létezik.
-            
-            // A felhasználó valószínűleg csak a "szemetet" akarja eltüntetni a képernyőről.
-            // Ha utána rajzolni akar (shift+click), és Start-ot nyom...
-            // A `handleEdit` Life módban a `lifeGrid`-et módosítja.
-            // Ha Start-ot nyom, az `initLife` felülírja?
-            // IGEN! Az `initLife` mindig újraépíti a rácsot a rétegekből.
-            // Ez a program logikája: A spirál a "forrás".
-            
-            // Ha a felhasználó "üres" rácsot akar, akkor ki kell kapcsolnia a rétegeket, vagy törölni őket.
-            // De tegyük fel, hogy csak a "Game of Life" szimuláció eredményét akarja törölni, és látni a sötétséget.
-            // Rendben, a fenti kód ezt teszi.
         }
 
         const LIFE_RULES = {
@@ -696,24 +873,6 @@
 
         function onColorModeChange() {
             const mode = document.getElementById('colorMode').value;
-            // Ha Trail módba váltunk, és a rács tele van "szeméttel" vagy régóta fut,
-            // érdemes lehet újrakalkulálni a jelenlegi lifeGrid alapján.
-            // De mivel a stepLife folyamatosan frissíti a háttérben is, elvileg jó.
-            // A probléma az lehet, hogy a displayGrid "történelme" nem releváns, ha most váltunk.
-            // Vagy épp ellenkezőleg: azt akarjuk látni.
-            
-            // A felhasználó panasza: "előző képtartalom megjelenik".
-            // Valószínűleg arra gondol, hogy a Trail mód bekapcsolásakor a "múlt" hirtelen megjelenik,
-            // ami zavaró lehet, ha eddig nem láttuk.
-            // Vagy Age módnál hirtelen színes lesz minden.
-            
-            // A legbiztosabb, ha a jelenlegi pillanatra "szinkronizáljuk" a nézetet.
-            // Trail módnál: A jelenleg élő sejtek legyenek 255, a többi 0 (töröljük a történelmet).
-            // Age módnál: A jelenleg élő sejtek kora maradjon meg (hiszen az valós adat),
-            // de ha esetleg inkonzisztens lenne, akkor... a stepLife karbantartja.
-            
-            // A felhasználó kérése: "mindig az aktuálisan kiválasztott paraméterek alapján számolja ki".
-            // Ha Trail-re váltunk, reseteljük a trail-t (csak az élők látszanak, nincs csóva).
             if (mode === 'trail') {
                 for(let i=0; i<TOTAL_ITEMS; i++) {
                     displayGrid[i] = lifeGrid[i] ? 255 : 0;
