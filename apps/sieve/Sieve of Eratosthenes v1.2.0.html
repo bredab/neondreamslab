@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Sieve of Eratosthenes v1.1.0</title>
+    <title>Sieve of Eratosthenes v1.2.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -170,6 +170,12 @@
             box-shadow: 0 0 10px #f1c40f;
         }
 
+        .cell.sqrt-marker {
+            border: 3px solid #3498db !important; /* Blue border for sqrt(n) */
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+            z-index: 5;
+        }
+
         /* Toggle Switch */
         .switch {
             position: relative;
@@ -274,7 +280,7 @@
     <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
 
     <div class="sidebar">
-        <h1>Sieve of Eratosthenes v1.1.0</h1>
+        <h1>Sieve of Eratosthenes v1.2.0</h1>
         
         <div class="description">
             This visualization demonstrates the Sieve of Eratosthenes. <br>
@@ -409,6 +415,13 @@
                 cell.id = 'cell-' + i;
                 cell.textContent = i;
                 if (i === 1) cell.style.opacity = '0.3';
+                
+                // Mark sqrt(n)
+                if (i === Math.floor(Math.sqrt(MAX_NUMBER))) {
+                    cell.classList.add('sqrt-marker');
+                    cell.title = "Root limit (√n)";
+                }
+
                 grid.appendChild(cell);
             }
             updateCellFontSize();
@@ -520,15 +533,24 @@
             // 1. Find the next 1 bit (Prime)
             let foundNext = false;
             
-            // Optimization for display: if passed root
-            if (currentPrime * currentPrime > MAX_NUMBER) {
-                // Just color the rest quickly
-                for(let i = currentPrime; i <= MAX_NUMBER; i++) {
-                    if(numbers[i]) highlightCell(i, 'prime');
+            // Optimization: If the next candidate prime is greater than sqrt(MAX_NUMBER),
+            // then all remaining unmarked numbers are prime.
+            if (currentPrime > Math.sqrt(MAX_NUMBER)) {
+                statusDiv.textContent = `Passed √n (${Math.floor(Math.sqrt(MAX_NUMBER))}). Marking all remaining numbers as prime...`;
+                
+                // Animate marking the rest quickly
+                for (let i = currentPrime; i <= MAX_NUMBER; i++) {
+                    if (numbers[i]) {
+                        highlightCell(i, 'prime');
+                        // Optional: slight delay for visual effect or play sound sparingly
+                        // if (!isAutoPlaying) await new Promise(r => setTimeout(r, 10)); 
+                    }
                 }
+                
                 statusDiv.textContent = "Done! All primes found.";
                 playSound('done');
                 isAnimating = false;
+                stopAutoPlay(); // Ensure auto-play stops
                 return;
             }
 
@@ -537,12 +559,31 @@
                 currentPrime++;
             }
 
-            if (currentPrime > MAX_NUMBER) {
-                statusDiv.textContent = "Done!";
-                playSound('done');
-                isAnimating = false; // Fix: ensure we reset this
-                return;
-            }
+            // After finding the next prime, check again if we've exceeded the limit
+            // This handles the case where the loop incremented currentPrime past the limit or max
+             if (currentPrime * currentPrime > MAX_NUMBER) {
+                 // We found a prime (or passed max), but its square is > MAX_NUMBER.
+                 // This means we don't need to sieve its multiples.
+                 // However, we still need to mark IT as prime.
+                 // And technically, all subsequent numbers are also prime.
+                 
+                 // Mark this prime if valid
+                 if (currentPrime <= MAX_NUMBER) {
+                     highlightCell(currentPrime, 'prime');
+                     playSound('prime');
+                 }
+                 
+                 // Mark all remaining
+                 for (let i = currentPrime + 1; i <= MAX_NUMBER; i++) {
+                     if (numbers[i]) highlightCell(i, 'prime');
+                 }
+                 
+                 statusDiv.textContent = "Done! All primes found (passed √n).";
+                 playSound('done');
+                 isAnimating = false;
+                 stopAutoPlay();
+                 return;
+             }
 
             // This is a prime!
             highlightCell(currentPrime, 'prime');
