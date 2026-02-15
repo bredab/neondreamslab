@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ulam Laboratórium v1.8.0</title>
+    <title>Ulam Laboratórium v1.9.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -240,7 +240,7 @@
     <div class="controls" id="sidebar">
         
         <div style="padding: 15px; border-bottom: 1px solid #444; background: #252525;">
-            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.8.0</small></h2>
+            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.9.0</small></h2>
         </div>
 
         <!-- SECTION 1: KURZOR & INFÓ -->
@@ -271,8 +271,10 @@
 
                 <label style="margin-top:10px;">Elrendezés</label>
                 <div class="mode-selector">
-                    <label><input type="radio" name="layoutMode" value="spiral" checked onchange="drawSpiral()"> Spirál</label>
+                    <label><input type="radio" name="layoutMode" value="spiral" checked onchange="drawSpiral()"> Ulam Spirál</label>
                     <label><input type="radio" name="layoutMode" value="linear" onchange="drawSpiral()"> Lineáris</label>
+                    <label><input type="radio" name="layoutMode" value="sacks" onchange="drawSpiral()"> Sacks Spirál</label>
+                    <label><input type="radio" name="layoutMode" value="vogel" onchange="drawSpiral()"> Vogel Spirál</label>
                 </div>
                 
                 <div class="mode-selector">
@@ -618,14 +620,28 @@
             if (pos.valid) {
                 const relX = pos.x - CX; const relY = -(pos.y - CY); 
                 const inputs = getInputs(); 
-                let idx;
+                let idx, valText;
+                
+                // Csak Ulam és Linear módnál tudjuk pontosan visszafejteni az indexet a rácspontból
                 if (inputs.layout === 'linear') {
                     idx = getLinearIndex(pos.x, pos.y);
-                } else {
+                    const val = inputs.start + (idx * inputs.incr);
+                    valText = val.toLocaleString();
+                    infoIdx.textContent = idx.toLocaleString();
+                } else if (inputs.layout === 'spiral') {
                     idx = getUlamIndex(pos.x, pos.y);
+                    const val = inputs.start + (idx * inputs.incr);
+                    valText = val.toLocaleString();
+                    infoIdx.textContent = idx.toLocaleString();
+                } else {
+                    // Sacks/Vogel esetén ez nem triviális (közelítés kellene)
+                    idx = "-";
+                    valText = "-";
+                    infoIdx.textContent = "N/A";
                 }
-                const val = inputs.start + (idx * inputs.incr);
-                infoPos.textContent = `X:${relX} Y:${relY}`; infoIdx.textContent = idx.toLocaleString(); infoVal.textContent = val.toLocaleString();
+                
+                infoPos.textContent = `X:${relX} Y:${relY}`; 
+                infoVal.textContent = valText;
             } else { resetStatusPanel(); }
         }
 
@@ -723,7 +739,7 @@
         function render() {
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
             const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
-            const isLinear = current.layout === 'linear';
+            const layout = current.layout;
 
             const showLayers = current.mode !== 'empty';
             const queue = []; 
@@ -734,24 +750,41 @@
             }
 
             // Init coords based on layout
-            let x = 0, y = 0; // Relative for Spiral, Absolute for Linear?
-            // Actually, for Linear we just need cx, cy.
-            // Let's use separate variables to avoid confusion.
-            // Spiral state:
             let sx = 0, sy = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
-            // Linear state:
             let lx = 0, ly = 0;
+
+            // Scaling for continuous spirals
+            // Max radius = min(GRID_SIZE/2, 500)
+            const maxRadius = Math.min(GRID_SIZE/2, 500);
+            const maxN = TOTAL_ITEMS;
+            const mathMaxR = Math.sqrt(maxN); // Sacks & Vogel both scale with sqrt(n)
+            const scaleFactor = maxRadius / mathMaxR;
+            const vogelAngle = 2.39996323; // Golden angle in radians
 
             let count = 0;
             for (let i = 0; i < TOTAL_ITEMS; i++) {
                 let cx, cy;
 
-                if (isLinear) {
+                if (layout === 'linear') {
                     cx = lx; 
                     cy = ly;
-                } else {
+                } else if (layout === 'spiral') {
                     cx = CX + sx; 
                     cy = CY - sy;
+                } else if (layout === 'sacks') {
+                    // Sacks Spiral: r = sqrt(i), theta = 2*PI*sqrt(i)
+                    const r = Math.sqrt(i) * scaleFactor;
+                    const theta = 2 * Math.PI * Math.sqrt(i);
+                    // Align squares on positive x axis? Usually they spiral out.
+                    // Let's use standard formula.
+                    cx = Math.round(CX + r * Math.cos(theta));
+                    cy = Math.round(CY - r * Math.sin(theta));
+                } else if (layout === 'vogel') {
+                    // Vogel Spiral: r = c*sqrt(i), theta = i * 137.5 deg
+                    const r = Math.sqrt(i) * scaleFactor;
+                    const theta = i * vogelAngle;
+                    cx = Math.round(CX + r * Math.cos(theta));
+                    cy = Math.round(CY - r * Math.sin(theta));
                 }
 
                 // Check bounds just in case (though loop ensures validity)
@@ -781,18 +814,19 @@
 
                 // Advance coordinates
                 if (i < TOTAL_ITEMS - 1) { 
-                    if (isLinear) {
+                    if (layout === 'linear') {
                         lx++;
                         if (lx >= GRID_SIZE) { lx = 0; ly++; }
-                    } else {
+                    } else if (layout === 'spiral') {
                         sx += dx; sy += dy; segmentPassed++; 
                         if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } 
                     }
+                    // Sacks/Vogel use direct calculation from 'i', no incremental state needed
                 }
             }
             ctx.putImageData(imgData, 0, 0); 
-            // Center point visual aid (only for Spiral)
-            if (!isLinear) {
+            // Center point visual aid (not for Linear)
+            if (layout !== 'linear') {
                 ctx.fillStyle = 'white'; ctx.fillRect(CX, CY, 1, 1);
             }
             countSpan.textContent = count.toLocaleString();
@@ -802,7 +836,7 @@
         function initLife() {
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
             const showLayers = current.mode !== 'empty';
-            const isLinear = current.layout === 'linear';
+            const layout = current.layout;
             
             const queue = []; 
             if (showLayers) {
@@ -817,10 +851,28 @@
             let sx = 0, sy = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
             let lx = 0, ly = 0;
 
+            const maxRadius = Math.min(GRID_SIZE/2, 500);
+            const scaleFactor = maxRadius / Math.sqrt(TOTAL_ITEMS);
+            const vogelAngle = 2.39996323;
+
             for (let i = 0; i < TOTAL_ITEMS; i++) {
                 let cx, cy;
-                if (isLinear) { cx = lx; cy = ly; }
-                else { cx = CX + sx; cy = CY - sy; }
+                
+                if (layout === 'linear') {
+                    cx = lx; cy = ly;
+                } else if (layout === 'spiral') {
+                    cx = CX + sx; cy = CY - sy;
+                } else if (layout === 'sacks') {
+                    const r = Math.sqrt(i) * scaleFactor;
+                    const theta = 2 * Math.PI * Math.sqrt(i);
+                    cx = Math.round(CX + r * Math.cos(theta));
+                    cy = Math.round(CY - r * Math.sin(theta));
+                } else if (layout === 'vogel') {
+                    const r = Math.sqrt(i) * scaleFactor;
+                    const theta = i * vogelAngle;
+                    cx = Math.round(CX + r * Math.cos(theta));
+                    cy = Math.round(CY - r * Math.sin(theta));
+                }
 
                 if (cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE) {
                     let isAlive = 0;
@@ -839,8 +891,8 @@
                 }
 
                 if (i < TOTAL_ITEMS - 1) { 
-                    if (isLinear) { lx++; if (lx >= GRID_SIZE) { lx = 0; ly++; } }
-                    else { sx += dx; sy += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
+                    if (layout === 'linear') { lx++; if (lx >= GRID_SIZE) { lx = 0; ly++; } }
+                    else if (layout === 'spiral') { sx += dx; sy += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
                 }
             }
             resumeLife();
