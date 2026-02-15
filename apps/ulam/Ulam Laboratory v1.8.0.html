@@ -140,7 +140,13 @@
             transition: margin-left 0.3s ease;
         }
         .controls.hidden ~ .canvas-container { margin-left: 0; }
-        canvas { display: block; image-rendering: pixelated; transform-origin: 0 0; }
+        canvas { 
+            display: block; 
+            image-rendering: pixelated; 
+            transform-origin: 0 0; 
+            border: 1px solid #666; /* Border directly on canvas */
+            box-sizing: border-box; /* Include border in size */
+        }
 
         /* Canvas Overlay Controls */
         .canvas-controls {
@@ -1067,7 +1073,15 @@
         }
 
         function applyTransform() { canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`; }
-        function fitToScreen() { const rect = container.getBoundingClientRect(); const s = Math.min((rect.width-20)/GRID_SIZE, (rect.height-20)/GRID_SIZE, 1); scale = Math.max(s, 0.1); translateX = (rect.width - GRID_SIZE*scale)/2; translateY = (rect.height - GRID_SIZE*scale)/2; applyTransform(); }
+        function fitToScreen() { 
+            const rect = container.getBoundingClientRect(); 
+            // Allow scale > 1 if grid is small
+            const s = Math.min((rect.width-20)/GRID_SIZE, (rect.height-20)/GRID_SIZE); 
+            scale = Math.max(s, 0.1); 
+            translateX = (rect.width - GRID_SIZE*scale)/2; 
+            translateY = (rect.height - GRID_SIZE*scale)/2; 
+            applyTransform(); 
+        }
         setTimeout(fitToScreen, 100); window.addEventListener('resize', fitToScreen);
         container.addEventListener('wheel', e => { e.preventDefault(); const rect = container.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; const factor = Math.exp((e.deltaY<0?1:-1)*0.1); const nextScale = scale * factor; translateX = mx - (mx - translateX) * factor; translateY = my - (my - translateY) * factor; scale = nextScale; applyTransform(); });
 
