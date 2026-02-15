@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ulam Laboratórium v1.7.0</title>
+    <title>Ulam Laboratórium v1.8.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -235,7 +235,7 @@
     <div class="controls" id="sidebar">
         
         <div style="padding: 15px; border-bottom: 1px solid #444; background: #252525;">
-            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.7.0</small></h2>
+            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.8.0</small></h2>
         </div>
 
         <!-- SECTION 1: KURZOR & INFÓ -->
@@ -276,6 +276,16 @@
                     <label><input type="radio" name="ulamMode" value="cube" onchange="drawSpiral()"> Köb</label>
                     <label><input type="radio" name="ulamMode" value="step" onchange="drawSpiral()"> Szekvencia</label>
                     <label><input type="radio" name="ulamMode" value="empty" onchange="drawSpiral()"> Üres (Csak középpont)</label>
+                </div>
+
+                <div class="control-group" style="margin-top:10px;">
+                    <label for="gridSize">Rács Méret (Grid Size)</label>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <button class="icon-btn" onclick="changeGridSize(-10)">-</button>
+                        <input type="range" id="gridSizeSlider" min="10" max="1001" value="1001" step="1" oninput="updateGridSize(this.value)" style="flex:1;">
+                        <button class="icon-btn" onclick="changeGridSize(10)">+</button>
+                    </div>
+                    <input type="number" id="gridSizeInput" value="1001" min="10" max="1001" onchange="updateGridSize(this.value)" style="text-align:center; margin-top:2px;">
                 </div>
             </div>
         </div>
@@ -398,10 +408,10 @@
         const infoVal = document.getElementById('infoVal');
         const btnStart = document.getElementById('btnStart');
 
-        const GRID_SIZE = 1001;
-        const TOTAL_ITEMS = GRID_SIZE * GRID_SIZE; 
-        const CX = Math.floor(GRID_SIZE / 2);
-        const CY = Math.floor(GRID_SIZE / 2);
+        let GRID_SIZE = 1001;
+        let TOTAL_ITEMS = GRID_SIZE * GRID_SIZE; 
+        let CX = Math.floor(GRID_SIZE / 2);
+        let CY = Math.floor(GRID_SIZE / 2);
 
         let layers = []; 
         let manualEdits = new Map(); 
@@ -1104,6 +1114,52 @@
             a.download = 'ulam_projekt.json';
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        function changeGridSize(delta) {
+            let newVal = parseInt(document.getElementById('gridSizeInput').value) + delta;
+            if (newVal < 10) newVal = 10;
+            if (newVal > 1001) newVal = 1001;
+            updateGridSize(newVal);
+        }
+
+        function updateGridSize(val) {
+            val = parseInt(val);
+            if (isNaN(val) || val < 10) val = 10;
+            if (val > 1001) val = 1001; // Limit max size if needed, or allow larger? User said 10-1001.
+
+            if (val === GRID_SIZE) return;
+
+            GRID_SIZE = val;
+            TOTAL_ITEMS = GRID_SIZE * GRID_SIZE;
+            CX = Math.floor(GRID_SIZE / 2);
+            CY = Math.floor(GRID_SIZE / 2);
+
+            // Update UI
+            document.getElementById('gridSizeInput').value = val;
+            document.getElementById('gridSizeSlider').value = val;
+
+            // Resize Canvas
+            canvas.width = GRID_SIZE;
+            canvas.height = GRID_SIZE;
+
+            // Reallocate Grids
+            lifeGrid = new Uint8Array(TOTAL_ITEMS);
+            nextGrid = new Uint8Array(TOTAL_ITEMS);
+            displayGrid = new Float32Array(TOTAL_ITEMS);
+            ageGrid = new Uint32Array(TOTAL_ITEMS);
+            
+            // Clear manual edits as indices are invalid now
+            // Or try to remap? Remapping is complex (coord vs index). 
+            // Clearing is safer for v1.
+            manualEdits.clear(); 
+
+            fitToScreen();
+            if (lifeInterval) {
+                resetLife(); // Stop simulation if running
+            } else {
+                drawSpiral();
+            }
         }
 
         function importConfig(input) {
