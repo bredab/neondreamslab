@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ulam Laboratórium v1.6.0</title>
+    <title>Ulam Laboratórium v1.7.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -130,6 +130,7 @@
         .canvas-container { 
             background-color: #000; 
             box-shadow: inset 0 0 50px rgba(0,0,0,0.8); 
+            border: 2px solid #555; /* Látható keret */
             overflow: hidden; 
             flex-grow: 1; 
             display: block; 
@@ -234,7 +235,7 @@
     <div class="controls" id="sidebar">
         
         <div style="padding: 15px; border-bottom: 1px solid #444; background: #252525;">
-            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.6.0</small></h2>
+            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.7.0</small></h2>
         </div>
 
         <!-- SECTION 1: KURZOR & INFÓ -->
@@ -261,6 +262,12 @@
                 <div class="control-group">
                     <label for="increment">Növekmény</label>
                     <input type="number" id="increment" value="1" min="1" oninput="drawSpiral()">
+                </div>
+
+                <label style="margin-top:10px;">Elrendezés</label>
+                <div class="mode-selector">
+                    <label><input type="radio" name="layoutMode" value="spiral" checked onchange="drawSpiral()"> Spirál</label>
+                    <label><input type="radio" name="layoutMode" value="linear" onchange="drawSpiral()"> Lineáris</label>
                 </div>
                 
                 <div class="mode-selector">
@@ -440,20 +447,15 @@
             let y = -(gy - CY); 
             if (x === 0 && y === 0) return 0;
             const k = Math.max(Math.abs(x), Math.abs(y)); 
-            
-            // Jobb oldal: x = k, y > -k
             if (x === k && y > -k) return (2*k-1)**2 + (y + k - 1);
-            
-            // Felső oldal: y = k, x >= -k (JAVÍTVA: > helyett >=, hogy a bal-felső sarok (-k, k) ide tartozzon)
             if (y === k && x >= -k) return ((2*k-1)**2) + (2*k - 1) + (k - x);
-            
-            // Bal oldal: x = -k, y < k
             if (x === -k && y < k) return ((2*k-1)**2) + (4*k - 1) + (k - y);
-            
-            // Alsó oldal: y = -k, x > -k
             if (y === -k && x > -k) return ((2*k-1)**2) + (6*k - 1) + (x + k);
-            
             return 0;
+        }
+
+        function getLinearIndex(gx, gy) {
+            return gy * GRID_SIZE + gx;
         }
 
         function getCanvasCoordinates(e) {
@@ -471,11 +473,13 @@
 
         // --- UI ---
         function getInputs() {
+            const layoutMode = document.querySelector('input[name="layoutMode"]:checked') ? document.querySelector('input[name="layoutMode"]:checked').value : 'spiral';
             return {
                 start: parseInt(document.getElementById('startValue').value) || 0,
                 incr: parseInt(document.getElementById('increment').value) || 1,
                 mode: document.querySelector('input[name="ulamMode"]:checked').value,
-                color: document.getElementById('layerColor').value
+                color: document.getElementById('layerColor').value,
+                layout: layoutMode
             };
         }
 
@@ -598,10 +602,15 @@
             const pos = getCanvasCoordinates(e);
             if (pos.valid) {
                 const relX = pos.x - CX; const relY = -(pos.y - CY); 
-                const ulamIdx = getUlamIndex(pos.x, pos.y);
                 const inputs = getInputs(); 
-                const val = inputs.start + (ulamIdx * inputs.incr);
-                infoPos.textContent = `X:${relX} Y:${relY}`; infoIdx.textContent = ulamIdx; infoVal.textContent = val.toLocaleString();
+                let idx;
+                if (inputs.layout === 'linear') {
+                    idx = getLinearIndex(pos.x, pos.y);
+                } else {
+                    idx = getUlamIndex(pos.x, pos.y);
+                }
+                const val = inputs.start + (idx * inputs.incr);
+                infoPos.textContent = `X:${relX} Y:${relY}`; infoIdx.textContent = idx.toLocaleString(); infoVal.textContent = val.toLocaleString();
             } else { resetStatusPanel(); }
         }
 
@@ -699,7 +708,8 @@
         function render() {
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
             const imgData = ctx.createImageData(GRID_SIZE, GRID_SIZE); const data = imgData.data;
-            
+            const isLinear = current.layout === 'linear';
+
             const showLayers = current.mode !== 'empty';
             const queue = []; 
             
@@ -708,33 +718,68 @@
                 queue.push({ ...current, isPreview: true, rgb: currentRgb });
             }
 
-            let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            // Init coords based on layout
+            let x = 0, y = 0; // Relative for Spiral, Absolute for Linear?
+            // Actually, for Linear we just need cx, cy.
+            // Let's use separate variables to avoid confusion.
+            // Spiral state:
+            let sx = 0, sy = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            // Linear state:
+            let lx = 0, ly = 0;
+
             let count = 0;
             for (let i = 0; i < TOTAL_ITEMS; i++) {
-                const cx = CX + x; const cy = CY - y; const pixelIndex = (cy * GRID_SIZE + cx) * 4; const manualIdx = cy * GRID_SIZE + cx;
-                let r=0, g=0, b=0, a=0;
-                
-                if (showLayers) {
-                    for (let l = 0; l < queue.length; l++) {
-                        const layer = queue[l]; let isMatch = false;
-                        if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isMatch = true; }
-                        else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime') isMatch = isPrime(val); else if (layer.mode === 'square') isMatch = isSquare(val); else if (layer.mode === 'cube') isMatch = isCube(val); }
-                        if (isMatch) { r = layer.rgb[0]; g = layer.rgb[1]; b = layer.rgb[2]; a = 255; }
+                let cx, cy;
+
+                if (isLinear) {
+                    cx = lx; 
+                    cy = ly;
+                } else {
+                    cx = CX + sx; 
+                    cy = CY - sy;
+                }
+
+                // Check bounds just in case (though loop ensures validity)
+                if (cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE) {
+                    const pixelIndex = (cy * GRID_SIZE + cx) * 4; 
+                    const manualIdx = cy * GRID_SIZE + cx;
+                    let r=0, g=0, b=0, a=0;
+                    
+                    if (showLayers) {
+                        for (let l = 0; l < queue.length; l++) {
+                            const layer = queue[l]; let isMatch = false;
+                            if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isMatch = true; }
+                            else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime') isMatch = isPrime(val); else if (layer.mode === 'square') isMatch = isSquare(val); else if (layer.mode === 'cube') isMatch = isCube(val); }
+                            if (isMatch) { r = layer.rgb[0]; g = layer.rgb[1]; b = layer.rgb[2]; a = 255; }
+                        }
+                    }
+
+                    if (manualEdits.has(manualIdx)) { if (a === 0) { r=255; g=255; b=255; a=255; } else { r=0; g=0; b=0; a=255; } }
+                    
+                    // PREVIEW LAYER
+                    if (previewPixels.has(manualIdx)) {
+                        r = 0; g = 255; b = 0; a = 255;
+                    }
+
+                    if (a > 0) { data[pixelIndex] = r; data[pixelIndex+1] = g; data[pixelIndex+2] = b; data[pixelIndex+3] = a; count++; }
+                }
+
+                // Advance coordinates
+                if (i < TOTAL_ITEMS - 1) { 
+                    if (isLinear) {
+                        lx++;
+                        if (lx >= GRID_SIZE) { lx = 0; ly++; }
+                    } else {
+                        sx += dx; sy += dy; segmentPassed++; 
+                        if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } 
                     }
                 }
-
-                if (manualEdits.has(manualIdx)) { if (a === 0) { r=255; g=255; b=255; a=255; } else { r=0; g=0; b=0; a=255; } }
-                
-                // PREVIEW LAYER
-                if (previewPixels.has(manualIdx)) {
-                    // Zöld szín a preview-hoz
-                    r = 0; g = 255; b = 0; a = 255;
-                }
-
-                if (a > 0) { data[pixelIndex] = r; data[pixelIndex+1] = g; data[pixelIndex+2] = b; data[pixelIndex+3] = a; count++; }
-                if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
             }
-            ctx.putImageData(imgData, 0, 0); ctx.fillStyle = 'white'; ctx.fillRect(CX, CY, 1, 1);
+            ctx.putImageData(imgData, 0, 0); 
+            // Center point visual aid (only for Spiral)
+            if (!isLinear) {
+                ctx.fillStyle = 'white'; ctx.fillRect(CX, CY, 1, 1);
+            }
             countSpan.textContent = count.toLocaleString();
         }
 
@@ -742,6 +787,7 @@
         function initLife() {
             const current = getInputs(); const currentRgb = hexToRgb(current.color);
             const showLayers = current.mode !== 'empty';
+            const isLinear = current.layout === 'linear';
             
             const queue = []; 
             if (showLayers) {
@@ -752,26 +798,35 @@
             lifeGrid.fill(0);
             displayGrid.fill(0); // Reset Trail
             ageGrid.fill(0);     // Reset Age
-            let x = 0, y = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            
+            let sx = 0, sy = 0, dx = 1, dy = 0, segmentLength = 1, segmentPassed = 0, turnCount = 0;
+            let lx = 0, ly = 0;
+
             for (let i = 0; i < TOTAL_ITEMS; i++) {
-                let isAlive = 0;
-                
-                if (showLayers) {
-                    for (let l = 0; l < queue.length; l++) {
-                        const layer = queue[l];
-                        if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isAlive = 1; }
-                        else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime' && isPrime(val)) isAlive = 1; else if (layer.mode === 'square' && isSquare(val)) isAlive = 1; else if (layer.mode === 'cube' && isCube(val)) isAlive = 1; }
-                        if (isAlive) break;
+                let cx, cy;
+                if (isLinear) { cx = lx; cy = ly; }
+                else { cx = CX + sx; cy = CY - sy; }
+
+                if (cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE) {
+                    let isAlive = 0;
+                    if (showLayers) {
+                        for (let l = 0; l < queue.length; l++) {
+                            const layer = queue[l];
+                            if (layer.mode === 'step') { if (i >= layer.start && (i - layer.start) % layer.incr === 0) isAlive = 1; }
+                            else { const val = layer.start + (i * layer.incr); if (layer.mode === 'prime' && isPrime(val)) isAlive = 1; else if (layer.mode === 'square' && isSquare(val)) isAlive = 1; else if (layer.mode === 'cube' && isCube(val)) isAlive = 1; }
+                            if (isAlive) break;
+                        }
                     }
+                    const idx = cy * GRID_SIZE + cx; 
+                    if (manualEdits.has(idx)) isAlive = isAlive ? 0 : 1; 
+                    lifeGrid[idx] = isAlive;
+                    if (isAlive) { displayGrid[idx] = 255; ageGrid[idx] = 1; }
                 }
 
-                const idx = (CY - y) * GRID_SIZE + (CX + x); if (manualEdits.has(idx)) isAlive = isAlive ? 0 : 1; lifeGrid[idx] = isAlive;
-                // Init extra grids
-                if (isAlive) {
-                    displayGrid[idx] = 255;
-                    ageGrid[idx] = 1;
+                if (i < TOTAL_ITEMS - 1) { 
+                    if (isLinear) { lx++; if (lx >= GRID_SIZE) { lx = 0; ly++; } }
+                    else { sx += dx; sy += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
                 }
-                if (i < TOTAL_ITEMS - 1) { x += dx; y += dy; segmentPassed++; if (segmentPassed === segmentLength) { segmentPassed = 0; const tempDx = dx; dx = -dy; dy = tempDx; turnCount++; if (turnCount % 2 === 0) segmentLength++; } }
             }
             resumeLife();
         }
