@@ -316,7 +316,7 @@
                 <label for="sizeSlider">Grid Size: <span id="sizeLabel" style="color: #2ecc71; font-weight: bold;">10x10 (100)</span></label>
                 <div class="slider-container">
                     <button id="btnGridMinus" class="slider-btn">-</button>
-                    <input type="range" id="sizeSlider" min="10" max="100" step="1" value="10" style="width: 100%; cursor: pointer;">
+                    <input type="range" id="sizeSlider" min="10" max="210" step="1" value="10" style="width: 100%; cursor: pointer;">
                     <button id="btnGridPlus" class="slider-btn">+</button>
                 </div>
             </div>
@@ -495,7 +495,7 @@
             canvasHeight = size;
             
             // Calculate Max Grid Size: 1px cell + 1px gap = 2px minimum per cell
-            const maxGridSize = 100;
+            const maxGridSize = 210;
             
             // Update slider max
             sizeSlider.max = maxGridSize;
