@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Sieve of Eratosthenes v1.3.0</title>
+    <title>Sieve of Eratosthenes v1.4.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -143,6 +143,28 @@
             color: #f1c40f;
             min-height: 40px;
         }
+        
+        #hover-info {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #hover-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        #hover-details {
+            font-size: 14px;
+            color: #aaa;
+        }
 
         #canvas-container {
             width: 100%;
@@ -275,12 +297,17 @@
     <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
 
     <div class="sidebar">
-        <h1>Sieve of Eratosthenes v1.3.0</h1>
+        <h1>Sieve of Eratosthenes v1.4</h1>
         
         <div class="description">
             This visualization demonstrates the Sieve of Eratosthenes. <br>
             Green numbers are found primes. <br>
             The algorithm proceeds by filtering out multiples (marking them red) for each new prime discovered.
+        </div>
+
+        <div id="hover-info">
+            <div id="hover-number">Hover over grid</div>
+            <div id="hover-details">to see details</div>
         </div>
 
         <div class="controls">
@@ -324,7 +351,7 @@
     <div class="main-content">
         <div id="canvas-container">
             <canvas id="gridCanvas"></canvas>
-            <div id="tooltip"></div>
+            <!-- Tooltip removed as per request -->
         </div>
     </div>
 
@@ -334,13 +361,14 @@
         const canvas = document.getElementById('gridCanvas');
         const ctx = canvas.getContext('2d', { alpha: false }); // Optimization
         const container = document.getElementById('canvas-container');
-        const tooltip = document.getElementById('tooltip');
         const statusDiv = document.getElementById('status');
         const sizeSlider = document.getElementById('sizeSlider');
         const sizeLabel = document.getElementById('sizeLabel');
         const soundToggle = document.getElementById('soundToggle');
         const btnGridMinus = document.getElementById('btnGridMinus');
         const btnGridPlus = document.getElementById('btnGridPlus');
+        const hoverNumber = document.getElementById('hover-number');
+        const hoverDetails = document.getElementById('hover-details');
         
         let numbers = []; // true if potentially prime
         let cellStates = []; // 0: unknown, 1: prime, 2: composite, 3: scanning
@@ -490,6 +518,39 @@
             drawGrid();
         });
 
+        // Prime Factorization Helper
+        function getPrimeFactors(n) {
+            if (n < 2) return [];
+            const factors = [];
+            let d = 2;
+            let temp = n;
+            while (d * d <= temp) {
+                while (temp % d === 0) {
+                    factors.push(d);
+                    temp /= d;
+                }
+                d++;
+            }
+            if (temp > 1) factors.push(temp);
+            return factors;
+        }
+
+        function formatFactors(factors) {
+            if (factors.length === 0) return "";
+            if (factors.length === 1) return "Prime";
+            
+            // Count occurrences
+            const counts = {};
+            factors.forEach(f => {
+                counts[f] = (counts[f] || 0) + 1;
+            });
+            
+            // Format as string (e.g., 2^3 × 3)
+            return Object.entries(counts).map(([base, exp]) => {
+                return exp > 1 ? `${base}<sup>${exp}</sup>` : base;
+            }).join(' × ');
+        }
+
         // Mouse Interaction
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -511,17 +572,25 @@
                 if (cellStates[number] === 1) status = "Prime";
                 if (cellStates[number] === 2) status = "Composite";
                 
-                tooltip.style.display = 'block';
-                tooltip.style.left = (e.clientX + 10) + 'px';
-                tooltip.style.top = (e.clientY + 10) + 'px';
-                tooltip.innerHTML = `<strong>${number}</strong><br>${status}`;
+                hoverNumber.textContent = number;
+                
+                if (number === 1) {
+                    hoverDetails.innerHTML = "Not Prime or Composite";
+                } else if (cellStates[number] === 1) {
+                     hoverDetails.innerHTML = "Prime Number";
+                } else {
+                    const factors = getPrimeFactors(number);
+                    hoverDetails.innerHTML = formatFactors(factors);
+                }
             } else {
-                tooltip.style.display = 'none';
+                hoverNumber.textContent = "Hover over grid";
+                hoverDetails.textContent = "to see details";
             }
         });
 
         canvas.addEventListener('mouseleave', () => {
-            tooltip.style.display = 'none';
+            hoverNumber.textContent = "Hover over grid";
+            hoverDetails.textContent = "to see details";
         });
 
         function drawCell(i) {
