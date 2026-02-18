@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ulam Laboratórium v1.9.0</title>
+    <title>Ulam Laboratórium v1.10.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -240,7 +240,7 @@
     <div class="controls" id="sidebar">
         
         <div style="padding: 15px; border-bottom: 1px solid #444; background: #252525;">
-            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.9.0</small></h2>
+            <h2 style="margin: 0; font-size: 1.2rem; color: #fff;">Ulam Laboratórium <small style="font-size: 0.8rem; color: #888;">v1.10.0</small></h2>
         </div>
 
         <!-- SECTION 1: KURZOR & INFÓ -->
@@ -350,6 +350,7 @@
 
                 <div class="gol-controls">
                     <button class="gol-btn" id="btnStart" onclick="toggleLife()" style="background: #28a745;">Start</button>
+                    <button class="gol-btn" onclick="stepLifeManual()" style="background: #ffc107; color: #000;">Lépés</button>
                     <button class="gol-btn" onclick="resetLife()" style="background: #17a2b8;">Reset</button>
                 </div>
                 <button class="gol-btn" onclick="clearScreen()" style="background: #d63384; margin-top:5px; width:100%;">Törlés (Clear)</button>
@@ -362,6 +363,7 @@
             <div class="section-content">
                 <div class="drawing-tools">
                     <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')" title="Ceruza (Shift+Klikk)">✏️</button>
+                    <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')" title="Radír">🧹</button>
                     <button class="tool-btn" id="tool-square" onclick="setTool('square')" title="Téglalap">⬜</button>
                     <button class="tool-btn" id="tool-line" onclick="setTool('line')" title="Szakasz">📏</button>
                     <button class="tool-btn" id="tool-circle" onclick="setTool('circle')" title="Kör">⭕</button>
@@ -385,6 +387,11 @@
                     <button class="secondary-btn" onclick="exportConfig()" style="background:#555; margin-bottom:5px;">Mentés Fájlba (JSON)</button>
                     <button class="secondary-btn" onclick="document.getElementById('fileInput').click()" style="background:#555;">Betöltés Fájlból</button>
                     <input type="file" id="fileInput" style="display:none" onchange="importConfig(this)" accept=".json">
+                </div>
+                
+                <div style="margin-top:10px; border-top:1px solid #444; padding-top:10px;">
+                     <button class="secondary-btn" onclick="pasteFromClipboard()" style="background:#007bff;">📋 Beillesztés Vágólapról</button>
+                     <div class="helper-text">Kép konvertálása 1-bites grafikává</div>
                 </div>
             </div>
         </div>
@@ -540,6 +547,94 @@
         function deleteAllLayers() { if (confirm("Biztosan törölsz mindent?")) { layers = []; manualEdits.clear(); resetLife(); updateLayerListUI(); } }
         function saveImage() { const link = document.createElement('a'); link.download = 'ulam_spiral.png'; link.href = canvas.toDataURL(); link.click(); }
 
+        async function pasteFromClipboard() {
+            try {
+                const items = await navigator.clipboard.read();
+                for (const item of items) {
+                    const type = item.types.find(t => t.startsWith('image/'));
+                    if (type) {
+                        const blob = await item.getType(type);
+                        const img = new Image();
+                        img.onload = () => processPastedImage(img);
+                        img.src = URL.createObjectURL(blob);
+                        return;
+                    }
+                }
+                alert("Nem található kép a vágólapon!");
+            } catch (err) {
+                console.error(err);
+                alert("Hiba a beillesztés során: " + err.message + "\n(Lehet, hogy a böngésző nem engedélyezi?)");
+            }
+        }
+
+        function processPastedImage(img) {
+            // Off-screen canvas a feldolgozáshoz
+            const offCanvas = document.createElement('canvas');
+            const w = img.width;
+            const h = img.height;
+            
+            // Limit méret, ha túl nagy
+            const MAX_SIDE = GRID_SIZE; 
+            let drawW = w, drawH = h;
+            if (w > MAX_SIDE || h > MAX_SIDE) {
+                const ratio = Math.min(MAX_SIDE / w, MAX_SIDE / h);
+                drawW = Math.floor(w * ratio);
+                drawH = Math.floor(h * ratio);
+            }
+
+            offCanvas.width = drawW;
+            offCanvas.height = drawH;
+            const offCtx = offCanvas.getContext('2d');
+            offCtx.drawImage(img, 0, 0, drawW, drawH);
+            
+            const imgData = offCtx.getImageData(0, 0, drawW, drawH);
+            const data = imgData.data;
+            
+            // Középre igazítás
+            const startX = Math.floor((GRID_SIZE - drawW) / 2);
+            const startY = Math.floor((GRID_SIZE - drawH) / 2);
+
+            let addedCount = 0;
+            const isSimulating = lifeInterval || isPaused;
+
+            for (let y = 0; y < drawH; y++) {
+                for (let x = 0; x < drawW; x++) {
+                    const i = (y * drawW + x) * 4;
+                    const r = data[i];
+                    const g = data[i+1];
+                    const b = data[i+2];
+                    const a = data[i+3]; // Alpha
+
+                    // Luminancia alapú küszöbölés (1-bit konverzió)
+                    // (0.299*R + 0.587*G + 0.114*B)
+                    const lum = 0.299*r + 0.587*g + 0.114*b;
+                    
+                    // Ha elég világos és nem átlátszó -> 1 (Alive)
+                    // VAGY ha a felhasználó fekete rajzot akar fehér alapon?
+                    // Ulam lab alapja fekete. Tehát a világos pixelek legyenek aktívak.
+                    if (a > 128 && lum > 100) {
+                        const targetX = startX + x;
+                        const targetY = startY + y;
+                        
+                        if (targetX >= 0 && targetX < GRID_SIZE && targetY >= 0 && targetY < GRID_SIZE) {
+                            const idx = targetY * GRID_SIZE + targetX;
+                            if (isSimulating) {
+                                lifeGrid[idx] = 1;
+                            } else {
+                                manualEdits.set(idx, 1);
+                            }
+                            addedCount++;
+                        }
+                    }
+                }
+            }
+            
+            if (isSimulating && isPaused) renderLifeFrame();
+            else if (!isSimulating) render();
+            
+            alert(`Sikeres beillesztés! ${addedCount} pixel hozzáadva.`);
+        }
+
         // --- ESEMÉNYKEZELÉS (ÚJRAGONDOLVA) ---
         
         // 1. Mouse Down
@@ -551,7 +646,7 @@
                 const pos = getCanvasCoordinates(e);
                 if (!pos.valid) { isDrawing = false; return; }
 
-                if (currentTool === 'pencil') {
+                if (currentTool === 'pencil' || currentTool === 'eraser') {
                     handlePencil(pos);
                 } else {
                     // Shape start
@@ -583,7 +678,7 @@
                 const pos = getCanvasCoordinates(e);
                 if (!pos.valid) return;
 
-                if (currentTool === 'pencil') {
+                if (currentTool === 'pencil' || currentTool === 'eraser') {
                     handlePencil(pos);
                 } else {
                     // Shape Preview
@@ -595,7 +690,7 @@
 
         // 3. Mouse Up
         window.addEventListener('mouseup', () => { 
-            if (isDrawing && currentTool !== 'pencil' && shapeStart) {
+            if (isDrawing && currentTool !== 'pencil' && currentTool !== 'eraser' && shapeStart) {
                 // Commit Shape
                 commitShape();
                 render();
@@ -654,12 +749,23 @@
 
         function handlePencil(pos) {
             const idx = pos.y * GRID_SIZE + pos.x;
-            if (lifeInterval || isPaused) { 
-                lifeGrid[idx] = lifeGrid[idx] ? 0 : 1; 
-                if (isPaused) renderLifeFrame(); 
-            } else { 
-                if (manualEdits.has(idx)) manualEdits.delete(idx); else manualEdits.set(idx, 1); 
-                render(); 
+            
+            if (currentTool === 'eraser') {
+                 if (lifeInterval || isPaused) { 
+                    lifeGrid[idx] = 0; 
+                    if (isPaused) renderLifeFrame(); 
+                } else { 
+                    manualEdits.delete(idx);
+                    render(); 
+                }
+            } else {
+                if (lifeInterval || isPaused) { 
+                    lifeGrid[idx] = 1; 
+                    if (isPaused) renderLifeFrame(); 
+                } else { 
+                    manualEdits.set(idx, 1); 
+                    render(); 
+                }
             }
         }
 
@@ -999,6 +1105,13 @@
                 if(document.getElementById(`s${i}`).checked) s |= (1 << i);
             }
             return { b, s };
+        }
+
+        function stepLifeManual() {
+            if (lifeInterval) {
+                pauseLife();
+            }
+            stepLife();
         }
 
         function stepLife() {
