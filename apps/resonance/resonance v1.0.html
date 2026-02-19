@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>resonance v1.0</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .controls-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            flex-shrink: 0;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+
+        .global-controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        select, input[type="number"] {
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .param-cell {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .param-cell.disabled {
+            opacity: 0.6;
+            background: #eee;
+        }
+
+        .cell-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .cell-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8em;
+        }
+
+        .input-row input[type="number"] {
+            width: 100%;
+            padding: 2px 4px;
+        }
+        
+        .sign-toggle {
+            cursor: pointer;
+            user-select: none;
+            font-weight: bold;
+            width: 20px;
+            text-align: center;
+            display: inline-block;
+        }
+
+        #chart-container {
+            flex-grow: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            min-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <h1>resonance v1.0</h1>
+
+    <div class="controls-container">
+        <div class="global-controls">
+            <div class="control-group">
+                <label for="operation">Művelet:</label>
+                <select id="operation">
+                    <option value="sum">Összeg (Sum)</option>
+                    <option value="product">Szorzat (Product)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="auto-scale" checked>
+                    Auto Skála Y
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label for="resolution">Felbontás (pont/egység):</label>
+                <input type="number" id="resolution" value="10" min="1" max="100">
+            </div>
+
+            <div class="control-group">
+                <label for="range-max">X Max:</label>
+                <input type="number" id="range-max" value="100" min="10" max="100000">
+            </div>
+
+            <button id="update-btn">Frissítés</button>
+            <button id="reset-btn" style="background-color: #6c757d;">Alaphelyzet</button>
+        </div>
+
+        <div id="params-grid" class="params-grid">
+            <!-- Grid items will be generated here -->
+        </div>
+    </div>
+
+    <div id="chart-container"></div>
+
+    <script>
+        // State management
+        const state = {
+            params: Array.from({ length: 100 }, (_, i) => ({
+                k: i + 1,
+                enabled: i === 0, // Only k=1 enabled by default
+                a: 1.0,
+                sign: 1 // 1 for positive, -1 for negative
+            })),
+            operation: 'sum',
+            autoScale: true,
+            rangeMax: 100,
+            resolution: 10
+        };
+
+        // DOM Elements
+        const paramsGrid = document.getElementById('params-grid');
+        const operationSelect = document.getElementById('operation');
+        const autoScaleCheckbox = document.getElementById('auto-scale');
+        const rangeMaxInput = document.getElementById('range-max');
+        const resolutionInput = document.getElementById('resolution');
+        const updateBtn = document.getElementById('update-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // Initialize Grid
+        function initGrid() {
+            paramsGrid.innerHTML = '';
+            state.params.forEach((param, index) => {
+                const cell = document.createElement('div');
+                cell.className = `param-cell ${param.enabled ? '' : 'disabled'}`;
+                cell.dataset.index = index;
+
+                // Header with Checkbox and k value
+                const header = document.createElement('div');
+                header.className = 'cell-header';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = param.enabled;
+                checkbox.addEventListener('change', (e) => {
+                    param.enabled = e.target.checked;
+                    cell.className = `param-cell ${param.enabled ? '' : 'disabled'}`;
+                    requestUpdate();
+                });
+
+                const label = document.createElement('span');
+                label.textContent = `k = ${param.k}`;
+
+                header.appendChild(checkbox);
+                header.appendChild(label);
+
+                // Controls for 'a' and sign
+                const controls = document.createElement('div');
+                controls.className = 'cell-controls';
+
+                const inputRow = document.createElement('div');
+                inputRow.className = 'input-row';
+
+                // Sign Toggle
+                const signToggle = document.createElement('span');
+                signToggle.className = 'sign-toggle';
+                signToggle.textContent = param.sign === 1 ? '+' : '-';
+                signToggle.style.color = param.sign === 1 ? 'green' : 'red';
+                signToggle.title = "Előjel váltása";
+                signToggle.onclick = () => {
+                    param.sign *= -1;
+                    signToggle.textContent = param.sign === 1 ? '+' : '-';
+                    signToggle.style.color = param.sign === 1 ? 'green' : 'red';
+                    requestUpdate();
+                };
+
+                const aLabel = document.createElement('label');
+                aLabel.textContent = 'a:';
+
+                const aInput = document.createElement('input');
+                aInput.type = 'number';
+                aInput.value = param.a;
+                aInput.step = 0.1;
+                aInput.min = 0.01;
+                aInput.max = 100;
+                aInput.addEventListener('change', (e) => {
+                    let val = parseFloat(e.target.value);
+                    if (val < 0.01) val = 0.01;
+                    if (val > 100) val = 100;
+                    param.a = val;
+                    e.target.value = val;
+                    requestUpdate();
+                });
+
+                inputRow.appendChild(signToggle);
+                inputRow.appendChild(aLabel);
+                inputRow.appendChild(aInput);
+                controls.appendChild(inputRow);
+
+                cell.appendChild(header);
+                cell.appendChild(controls);
+                paramsGrid.appendChild(cell);
+            });
+        }
+
+        // Calculation Logic
+        function calculateData() {
+            const xValues = [];
+            const yValues = [];
+            
+            // Calculate step size based on resolution
+            // Higher resolution = more points per unit
+            const step = 1 / state.resolution;
+            const max = state.rangeMax;
+            
+            // Generate X values
+            for (let x = 0; x <= max; x += step) {
+                xValues.push(x);
+                
+                let y = state.operation === 'sum' ? 0 : 1;
+                let hasActive = false;
+
+                for (const param of state.params) {
+                    if (param.enabled) {
+                        hasActive = true;
+                        // Formula: +/- a * sin(x * pi * k)
+                        const val = param.sign * param.a * Math.sin(x * Math.PI * param.k);
+                        
+                        if (state.operation === 'sum') {
+                            y += val;
+                        } else {
+                            y *= val;
+                        }
+                    }
+                }
+                
+                if (!hasActive) y = 0;
+                yValues.push(y);
+            }
+
+            return { x: xValues, y: yValues };
+        }
+
+        // Chart Rendering
+        let plotInitialized = false;
+
+        function updateChart() {
+            const data = calculateData();
+            
+            const layout = {
+                title: state.operation === 'sum' ? 'Összeg (Sum)' : 'Szorzat (Product)',
+                xaxis: {
+                    title: 'x',
+                    range: [0, Math.min(100, state.rangeMax)], // Initial zoom
+                    rangeslider: { visible: true } // Enables scrolling/zooming slider
+                },
+                yaxis: {
+                    title: 'y',
+                    autorange: state.autoScale
+                },
+                margin: { t: 40, r: 20, l: 40, b: 40 },
+                showlegend: false
+            };
+
+            const plotData = [{
+                x: data.x,
+                y: data.y,
+                mode: 'lines',
+                type: 'scatter',
+                line: { width: 1.5 }
+            }];
+
+            if (!plotInitialized) {
+                Plotly.newPlot('chart-container', plotData, layout, {
+                    responsive: true,
+                    scrollZoom: true,
+                    displayModeBar: true
+                });
+                plotInitialized = true;
+            } else {
+                // If autoScale is off, we preserve current y-range
+                const updateLayout = {
+                    'xaxis.range': [0, state.rangeMax], // Update scrollbar range
+                    'yaxis.autorange': state.autoScale,
+                    title: state.operation === 'sum' ? 'Összeg (Sum)' : 'Szorzat (Product)'
+                };
+                
+                Plotly.react('chart-container', plotData, layout);
+            }
+        }
+
+        // Event Listeners & Updates
+        let updateTimeout;
+        function requestUpdate() {
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(updateChart, 100); // Debounce
+        }
+
+        operationSelect.addEventListener('change', (e) => {
+            state.operation = e.target.value;
+            requestUpdate();
+        });
+
+        autoScaleCheckbox.addEventListener('change', (e) => {
+            state.autoScale = e.target.checked;
+            requestUpdate();
+        });
+
+        rangeMaxInput.addEventListener('change', (e) => {
+            state.rangeMax = parseInt(e.target.value) || 100;
+            requestUpdate();
+        });
+
+        resolutionInput.addEventListener('change', (e) => {
+            state.resolution = parseInt(e.target.value) || 10;
+            requestUpdate();
+        });
+
+        updateBtn.addEventListener('click', updateChart);
+
+        resetBtn.addEventListener('click', () => {
+            state.params.forEach((p, i) => {
+                p.enabled = i === 0;
+                p.a = 1.0;
+                p.sign = 1;
+            });
+            initGrid();
+            requestUpdate();
+        });
+
+        // Init
+        initGrid();
+        updateChart();
+
+    </script>
+</body>
+</html>
