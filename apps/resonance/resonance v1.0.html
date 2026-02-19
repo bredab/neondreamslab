@@ -297,8 +297,8 @@
                 for (const param of state.params) {
                     if (param.enabled) {
                         hasActive = true;
-                        // Formula: +/- a * sin(x * pi * k)
-                        const val = param.sign * param.a * Math.sin(x * Math.PI * param.k);
+                        // Formula: +/- a * sin(x * pi / k)
+                        const val = param.sign * param.a * Math.sin(x * Math.PI / param.k);
                         
                         if (state.operation === 'sum') {
                             y += val;
