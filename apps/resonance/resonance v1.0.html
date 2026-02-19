@@ -156,6 +156,13 @@
                 </label>
             </div>
 
+            <div class="control-group" id="manual-scale-controls" style="display: none;">
+                <label for="y-min">Y Min:</label>
+                <input type="number" id="y-min" value="-10" style="width: 60px;">
+                <label for="y-max">Y Max:</label>
+                <input type="number" id="y-max" value="10" style="width: 60px;">
+            </div>
+
             <div class="control-group">
                 <label for="resolution">Felbontás (pont/egység):</label>
                 <input type="number" id="resolution" value="36" min="1" max="100">
@@ -196,6 +203,9 @@
         const paramsGrid = document.getElementById('params-grid');
         const operationSelect = document.getElementById('operation');
         const autoScaleCheckbox = document.getElementById('auto-scale');
+        const manualScaleControls = document.getElementById('manual-scale-controls');
+        const yMinInput = document.getElementById('y-min');
+        const yMaxInput = document.getElementById('y-max');
         const rangeMaxInput = document.getElementById('range-max');
         const resolutionInput = document.getElementById('resolution');
         const updateBtn = document.getElementById('update-btn');
@@ -326,12 +336,18 @@
                 xaxis: {
                     title: 'x',
                     range: [0, Math.min(100, state.rangeMax)], // Initial zoom
-                    rangeslider: { visible: true } // Enables scrolling/zooming slider
+                    rangeslider: { visible: true }, // Enables scrolling/zooming slider
+                    dtick: state.rangeMax > 1000 ? undefined : (state.rangeMax > 100 ? 5 : 1), // More ticks for smaller ranges
+                    gridcolor: '#eee',
+                    zerolinecolor: '#999'
                 },
                 yaxis: {
                     title: 'y',
-                    rangeslider: { visible: true }, // Enables scrolling/zooming slider
-                    autorange: state.autoScale
+                    autorange: state.autoScale,
+                    range: state.autoScale ? null : [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)],
+                    nticks: 20, // More dense ticks
+                    gridcolor: '#eee',
+                    zerolinecolor: '#999'
                 },
                 margin: { t: 40, r: 20, l: 40, b: 40 },
                 showlegend: false
@@ -353,12 +369,21 @@
                 });
                 plotInitialized = true;
             } else {
-                // If autoScale is off, we preserve current y-range
+                // If autoScale is off, we use manual range
                 const updateLayout = {
                     'xaxis.range': [0, state.rangeMax], // Update scrollbar range
                     'yaxis.autorange': state.autoScale,
+                    'yaxis.nticks': 20,
                     title: state.operation === 'sum' ? 'Összeg (Sum)' : 'Szorzat (Product)'
                 };
+                
+                if (!state.autoScale) {
+                    updateLayout['yaxis.range'] = [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)];
+                }
+
+                // Merge the new layout properties into the existing layout object for React
+                Object.assign(layout, updateLayout);
+                layout.yaxis.range = state.autoScale ? null : [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)];
                 
                 Plotly.react('chart-container', plotData, layout);
             }
@@ -378,8 +403,12 @@
 
         autoScaleCheckbox.addEventListener('change', (e) => {
             state.autoScale = e.target.checked;
+            manualScaleControls.style.display = state.autoScale ? 'none' : 'flex';
             requestUpdate();
         });
+
+        yMinInput.addEventListener('change', requestUpdate);
+        yMaxInput.addEventListener('change', requestUpdate);
 
         rangeMaxInput.addEventListener('change', (e) => {
             state.rangeMax = parseInt(e.target.value) || 100;
