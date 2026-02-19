@@ -144,8 +144,8 @@
             <div class="control-group">
                 <label for="operation">Művelet:</label>
                 <select id="operation">
-                    <option value="sum">Összeg (Sum)</option>
                     <option value="product">Szorzat (Product)</option>
+                    <option value="sum">Összeg (Sum)</option>
                 </select>
             </div>
             
@@ -158,7 +158,7 @@
 
             <div class="control-group">
                 <label for="resolution">Felbontás (pont/egység):</label>
-                <input type="number" id="resolution" value="10" min="1" max="100">
+                <input type="number" id="resolution" value="36" min="1" max="100">
             </div>
 
             <div class="control-group">
@@ -186,10 +186,10 @@
                 a: 1.0,
                 sign: 1 // 1 for positive, -1 for negative
             })),
-            operation: 'sum',
+            operation: 'product',
             autoScale: true,
             rangeMax: 100,
-            resolution: 10
+            resolution: 36
         };
 
         // DOM Elements
@@ -330,6 +330,7 @@
                 },
                 yaxis: {
                     title: 'y',
+                    rangeslider: { visible: true }, // Enables scrolling/zooming slider
                     autorange: state.autoScale
                 },
                 margin: { t: 40, r: 20, l: 40, b: 40 },
