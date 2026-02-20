@@ -328,15 +328,12 @@
                         
                         // For 'ramp' I used the rising code above.
 
-                        const val = param.a * rawVal;
+                        const val = param.a * rawVal + state.globalOffset;
                         y *= val;
                     }
                 }
                 
                 if (!hasActive) y = 0;
-                
-                // Add global offset
-                y += state.globalOffset;
                 
                 yValues.push(y);
             }
