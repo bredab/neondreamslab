@@ -300,10 +300,10 @@
 
                         switch (state.waveType) {
                             case 'sin':
-                                rawVal = Math.sin(arg);
+                                rawVal = Math.sqrt(param.k) * Math.sin(arg);
                                 break;
                             case 'cos':
-                                rawVal = Math.cos(arg);
+                                rawVal = Math.sqrt(param.k) * Math.cos(arg);
                                 break;
                             case 'saw':
                                 // Triangle wave: 2 * abs(2 * (t - floor(t + 0.5))) - 1
