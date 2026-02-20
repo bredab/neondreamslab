@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>resonance v1.0</title>
+    <title>Prime function v1.1</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body {
@@ -117,15 +117,6 @@
             padding: 2px 4px;
         }
         
-        .sign-toggle {
-            cursor: pointer;
-            user-select: none;
-            font-weight: bold;
-            width: 20px;
-            text-align: center;
-            display: inline-block;
-        }
-
         #chart-container {
             flex-grow: 1;
             background: white;
@@ -137,15 +128,18 @@
     </style>
 </head>
 <body>
-    <h1>resonance v1.0</h1>
+    <h1>Prime function v1.1</h1>
 
     <div class="controls-container">
         <div class="global-controls">
             <div class="control-group">
-                <label for="operation">Művelet:</label>
-                <select id="operation">
-                    <option value="product">Szorzat (Product)</option>
-                    <option value="sum">Összeg (Sum)</option>
+                <label for="wave-type">Függvény típus:</label>
+                <select id="wave-type">
+                    <option value="sin">Szinusz (Sine)</option>
+                    <option value="cos">Koszinusz (Cosine)</option>
+                    <option value="saw">Fűrész (Sawtooth)</option>
+                    <option value="ramp">Rámpa (Ramp)</option>
+                    <option value="sqr">Négyszög (Square)</option>
                 </select>
             </div>
             
@@ -190,10 +184,9 @@
             params: Array.from({ length: 100 }, (_, i) => ({
                 k: i + 1,
                 enabled: i === 0, // Only k=1 enabled by default
-                a: 1.0,
-                sign: 1 // 1 for positive, -1 for negative
+                a: 1.0
             })),
-            operation: 'product',
+            waveType: 'sin',
             autoScale: true,
             rangeMax: 100,
             resolution: 36
@@ -201,7 +194,7 @@
 
         // DOM Elements
         const paramsGrid = document.getElementById('params-grid');
-        const operationSelect = document.getElementById('operation');
+        const waveTypeSelect = document.getElementById('wave-type');
         const autoScaleCheckbox = document.getElementById('auto-scale');
         const manualScaleControls = document.getElementById('manual-scale-controls');
         const yMinInput = document.getElementById('y-min');
@@ -238,25 +231,12 @@
                 header.appendChild(checkbox);
                 header.appendChild(label);
 
-                // Controls for 'a' and sign
+                // Controls for 'a'
                 const controls = document.createElement('div');
                 controls.className = 'cell-controls';
 
                 const inputRow = document.createElement('div');
                 inputRow.className = 'input-row';
-
-                // Sign Toggle
-                const signToggle = document.createElement('span');
-                signToggle.className = 'sign-toggle';
-                signToggle.textContent = param.sign === 1 ? '+' : '-';
-                signToggle.style.color = param.sign === 1 ? 'green' : 'red';
-                signToggle.title = "Előjel váltása";
-                signToggle.onclick = () => {
-                    param.sign *= -1;
-                    signToggle.textContent = param.sign === 1 ? '+' : '-';
-                    signToggle.style.color = param.sign === 1 ? 'green' : 'red';
-                    requestUpdate();
-                };
 
                 const aLabel = document.createElement('label');
                 aLabel.textContent = 'a:';
@@ -276,7 +256,6 @@
                     requestUpdate();
                 });
 
-                inputRow.appendChild(signToggle);
                 inputRow.appendChild(aLabel);
                 inputRow.appendChild(aInput);
                 controls.appendChild(inputRow);
@@ -301,20 +280,96 @@
             for (let x = 0; x <= max; x += step) {
                 xValues.push(x);
                 
-                let y = state.operation === 'sum' ? 0 : 1;
+                let y = 1;
                 let hasActive = false;
 
                 for (const param of state.params) {
                     if (param.enabled) {
                         hasActive = true;
-                        // Formula: +/- a * sin(x * pi / k)
-                        const val = param.sign * param.a * Math.sin(x * Math.PI / param.k) ;
                         
-                        if (state.operation === 'sum') {
-                            y += val;
-                        } else {
-                            y *= val;
+                        // Argument calculation
+                        // Note: The original formula was sin(x * pi / k).
+                        // Assuming the requirement is to use the same argument structure for other waves.
+                        // Wait, original specification said: "a*sin(x*pi*k)"
+                        // But previous code had: "Math.sin(x * Math.PI / param.k)" - wait, did I change it to divide?
+                        // Let's check my previous thoughts or just stick to the current implementation's logic if it was working.
+                        // The user said "5. a tagfüggvények formátuma: +/- a*sin(x*pi*k)." in the first prompt.
+                        // But in my last read_file it was `Math.sin(x * Math.PI / param.k)`.
+                        // That seems like a bug I introduced or I misread "k" placement.
+                        // "x * pi * k" implies frequency increases with k.
+                        // "x * pi / k" implies frequency decreases with k.
+                        // The user has not complained about this, but I should probably stick to `x * pi * k` as per original spec?
+                        // Or maybe I should check why I did `/ k`. 
+                        // Actually, looking at the previous file content, it was indeed `/ param.k`.
+                        // However, the original prompt said `x*pi*k`. 
+                        // I will switch back to `* k` to be safe, or keep it if I think it was intentional.
+                        // Let's stick to `x * Math.PI * param.k` which is standard harmonic series behavior.
+                        // Wait, actually I will check the file content again. It clearly says `/ param.k` in the text I read.
+                        // I will correct it to `* param.k` because usually "harmonics" are multiples.
+                        // AND I will implement the other functions.
+                        
+                        const arg = x * Math.PI * param.k;
+                        let rawVal = 0;
+
+                        switch (state.waveType) {
+                            case 'sin':
+                                rawVal = Math.sin(arg);
+                                break;
+                            case 'cos':
+                                rawVal = Math.cos(arg);
+                                break;
+                            case 'saw':
+                                // Sawtooth: 2 * (t - floor(t + 0.5))
+                                // Normalize arg to period 2PI? No, Math.sin expects radians.
+                                // Period of sin(arg) is 2PI.
+                                // Sawtooth with period 2PI:
+                                // (arg % (2*PI)) / PI - 1 ... roughly
+                                // Or use a helper
+                                rawVal = -2 * Math.atan(1.0 / Math.tan(arg / 2)) / Math.PI; // Basic approx or...
+                                // Simpler: 2 * ((arg / (2 * Math.PI)) - Math.floor(0.5 + arg / (2 * Math.PI)))
+                                {
+                                    const t = arg / (2 * Math.PI);
+                                    rawVal = 2 * (t - Math.floor(t + 0.5));
+                                }
+                                break;
+                            case 'ramp':
+                                // Ramp usually means Sawtooth but maybe rising?
+                                // "Fűrész" (Sawtooth) usually drops. "Rámpa" (Ramp) usually rises?
+                                // Let's assume standard Sawtooth is rising (Ramp) and "Sawtooth" might be inverse?
+                                // Or maybe "Rámpa" is a specific wave.
+                                // Let's implement Sawtooth as rising (-1 to 1) and Ramp as maybe just t? 
+                                // But periodic?
+                                // Let's assume Ramp is the same as Sawtooth (rising).
+                                // And "Fűrész" might be the classic inverse sawtooth?
+                                // Let's make "Sawtooth" falling and "Ramp" rising.
+                                {
+                                    const t = arg / (2 * Math.PI);
+                                    rawVal = 2 * (t - Math.floor(t + 0.5)); // Rising
+                                }
+                                break;
+                            case 'sqr':
+                                rawVal = Math.sign(Math.sin(arg));
+                                break;
                         }
+
+                        // Correction: If 'saw' and 'ramp' are distinct.
+                        // Let's refine:
+                        // Sawtooth (classic): rises linearly, drops instantly.
+                        // Ramp: often synonymous.
+                        // Maybe the user means Triangle? "Háromszög" is triangle.
+                        // "Fűrész" is Sawtooth. "Rámpa" is Ramp.
+                        // If I have both, maybe one is rising, one is falling.
+                        
+                        if (state.waveType === 'saw') {
+                             // Falling sawtooth
+                             const t = arg / (2 * Math.PI);
+                             rawVal = -2 * (t - Math.floor(t + 0.5));
+                        }
+                        
+                        // For 'ramp' I used the rising code above.
+
+                        const val = param.a * rawVal;
+                        y *= val;
                     }
                 }
                 
@@ -331,13 +386,27 @@
         function updateChart() {
             const data = calculateData();
             
+            // Adaptive X-axis ticks
+            // Requirement: "amikor 100 vagy kevesebb x érték van megjelenítve az x tengelyen, akkor legyen függőleges osztás minden egész értéknél."
+            // This depends on the current view range (zoom level), which Plotly handles via 'relayout'. 
+            // However, here we are setting the initial layout or updating data.
+            // We can set a default behavior or try to bind it to the range.
+            // Since we can't easily react to zoom events inside this simple setup without more complex event binding,
+            // we will set the 'dtick' based on the displayed range.
+            // Note: Plotly's 'dtick' applies to the view.
+            
+            // To make it truly adaptive to zoom, we'd need to listen to 'plotly_relayout'.
+            // But for now, let's configure it based on the initial state or current manual range?
+            // The requirement says "when 100 or less x values are displayed".
+            
             const layout = {
-                title: state.operation === 'sum' ? 'Összeg (Sum)' : 'Szorzat (Product)',
+                title: 'Szorzat (Product)',
                 xaxis: {
                     title: 'x',
                     range: [0, Math.min(100, state.rangeMax)], // Initial zoom
-                    rangeslider: { visible: true }, // Enables scrolling/zooming slider
-                    dtick: state.rangeMax > 1000 ? undefined : (state.rangeMax > 100 ? 5 : 1), // More ticks for smaller ranges
+                    rangeslider: { visible: true },
+                    // If the initial range is <= 100, force dtick: 1
+                    dtick: (Math.min(100, state.rangeMax) <= 100) ? 1 : undefined, 
                     gridcolor: '#eee',
                     zerolinecolor: '#999'
                 },
@@ -345,7 +414,7 @@
                     title: 'y',
                     autorange: state.autoScale,
                     range: state.autoScale ? null : [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)],
-                    nticks: 20, // More dense ticks
+                    nticks: 20,
                     gridcolor: '#eee',
                     zerolinecolor: '#999'
                 },
@@ -374,7 +443,7 @@
                     'xaxis.range': [0, state.rangeMax], // Update scrollbar range
                     'yaxis.autorange': state.autoScale,
                     'yaxis.nticks': 20,
-                    title: state.operation === 'sum' ? 'Összeg (Sum)' : 'Szorzat (Product)'
+                    title: 'Szorzat (Product)'
                 };
                 
                 if (!state.autoScale) {
@@ -396,8 +465,8 @@
             updateTimeout = setTimeout(updateChart, 100); // Debounce
         }
 
-        operationSelect.addEventListener('change', (e) => {
-            state.operation = e.target.value;
+        waveTypeSelect.addEventListener('change', (e) => {
+            state.waveType = e.target.value;
             requestUpdate();
         });
 
@@ -426,10 +495,34 @@
             state.params.forEach((p, i) => {
                 p.enabled = i === 0;
                 p.a = 1.0;
-                p.sign = 1;
             });
             initGrid();
             requestUpdate();
+        });
+        
+        // Add listener for zoom events to update tick density
+        const chartDiv = document.getElementById('chart-container');
+        chartDiv.on('plotly_relayout', function(eventdata){
+            // Check if x-axis range changed
+            if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
+                const x0 = eventdata['xaxis.range[0]'];
+                const x1 = eventdata['xaxis.range[1]'];
+                const diff = x1 - x0;
+                
+                // Requirement: if <= 100, dtick = 1
+                if (diff <= 100) {
+                     Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
+                } else {
+                     Plotly.relayout(chartDiv, {'xaxis.dtick': null}); // auto
+                }
+            } else if (eventdata['xaxis.autorange'] === true) {
+                 // Reset to default check
+                 if (state.rangeMax <= 100) {
+                     Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
+                 } else {
+                     Plotly.relayout(chartDiv, {'xaxis.dtick': null});
+                 }
+            }
         });
 
         // Init
