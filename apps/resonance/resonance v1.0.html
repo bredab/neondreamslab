@@ -387,7 +387,7 @@
                     responsive: true,
                     scrollZoom: true,
                     displayModeBar: true
-                });
+                }).then(attachZoomListener);
                 plotInitialized = true;
             } else {
                 // If autoScale is off, we use manual range
@@ -463,28 +463,31 @@
         
         // Add listener for zoom events to update tick density
         const chartDiv = document.getElementById('chart-container');
-        chartDiv.on('plotly_relayout', function(eventdata){
-            // Check if x-axis range changed
-            if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
-                const x0 = eventdata['xaxis.range[0]'];
-                const x1 = eventdata['xaxis.range[1]'];
-                const diff = x1 - x0;
-                
-                // Requirement: if <= 100, dtick = 1
-                if (diff <= 100) {
-                     Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
-                } else {
-                     Plotly.relayout(chartDiv, {'xaxis.dtick': null}); // auto
+        
+        function attachZoomListener() {
+            chartDiv.on('plotly_relayout', function(eventdata){
+                // Check if x-axis range changed
+                if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
+                    const x0 = eventdata['xaxis.range[0]'];
+                    const x1 = eventdata['xaxis.range[1]'];
+                    const diff = x1 - x0;
+                    
+                    // Requirement: if <= 100, dtick = 1
+                    if (diff <= 100) {
+                         Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
+                    } else {
+                         Plotly.relayout(chartDiv, {'xaxis.dtick': null}); // auto
+                    }
+                } else if (eventdata['xaxis.autorange'] === true) {
+                     // Reset to default check
+                     if (state.rangeMax <= 100) {
+                         Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
+                     } else {
+                         Plotly.relayout(chartDiv, {'xaxis.dtick': null});
+                     }
                 }
-            } else if (eventdata['xaxis.autorange'] === true) {
-                 // Reset to default check
-                 if (state.rangeMax <= 100) {
-                     Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
-                 } else {
-                     Plotly.relayout(chartDiv, {'xaxis.dtick': null});
-                 }
-            }
-        });
+            });
+        }
 
         // Init
         initGrid();
