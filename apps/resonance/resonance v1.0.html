@@ -158,6 +158,11 @@
             </div>
 
             <div class="control-group">
+                <label for="global-offset">Y Offszet (+/- 1):</label>
+                <input type="number" id="global-offset" value="0" step="0.1" min="-1" max="1" style="width: 60px;">
+            </div>
+
+            <div class="control-group">
                 <label for="resolution">Felbontás (pont/egység):</label>
                 <input type="number" id="resolution" value="36" min="1" max="100">
             </div>
@@ -187,6 +192,7 @@
                 a: 1.0
             })),
             waveType: 'sin',
+            globalOffset: 0,
             autoScale: true,
             rangeMax: 100,
             resolution: 36
@@ -199,6 +205,7 @@
         const manualScaleControls = document.getElementById('manual-scale-controls');
         const yMinInput = document.getElementById('y-min');
         const yMaxInput = document.getElementById('y-max');
+        const globalOffsetInput = document.getElementById('global-offset');
         const rangeMaxInput = document.getElementById('range-max');
         const resolutionInput = document.getElementById('resolution');
         const updateBtn = document.getElementById('update-btn');
@@ -319,51 +326,24 @@
                                 rawVal = Math.cos(arg);
                                 break;
                             case 'saw':
-                                // Sawtooth: 2 * (t - floor(t + 0.5))
-                                // Normalize arg to period 2PI? No, Math.sin expects radians.
-                                // Period of sin(arg) is 2PI.
-                                // Sawtooth with period 2PI:
-                                // (arg % (2*PI)) / PI - 1 ... roughly
-                                // Or use a helper
-                                rawVal = -2 * Math.atan(1.0 / Math.tan(arg / 2)) / Math.PI; // Basic approx or...
-                                // Simpler: 2 * ((arg / (2 * Math.PI)) - Math.floor(0.5 + arg / (2 * Math.PI)))
+                                // Triangle wave: 2 * abs(2 * (t - floor(t + 0.5))) - 1
+                                // Period 2PI
+                                {
+                                    const t = arg / (2 * Math.PI);
+                                    // Triangle wave (symmetric rise and fall)
+                                    rawVal = 2 * Math.abs(2 * (t - Math.floor(t + 0.5))) - 1;
+                                }
+                                break;
+                            case 'ramp':
+                                // Ramp (rising sawtooth)
                                 {
                                     const t = arg / (2 * Math.PI);
                                     rawVal = 2 * (t - Math.floor(t + 0.5));
                                 }
                                 break;
-                            case 'ramp':
-                                // Ramp usually means Sawtooth but maybe rising?
-                                // "Fűrész" (Sawtooth) usually drops. "Rámpa" (Ramp) usually rises?
-                                // Let's assume standard Sawtooth is rising (Ramp) and "Sawtooth" might be inverse?
-                                // Or maybe "Rámpa" is a specific wave.
-                                // Let's implement Sawtooth as rising (-1 to 1) and Ramp as maybe just t? 
-                                // But periodic?
-                                // Let's assume Ramp is the same as Sawtooth (rising).
-                                // And "Fűrész" might be the classic inverse sawtooth?
-                                // Let's make "Sawtooth" falling and "Ramp" rising.
-                                {
-                                    const t = arg / (2 * Math.PI);
-                                    rawVal = 2 * (t - Math.floor(t + 0.5)); // Rising
-                                }
-                                break;
                             case 'sqr':
                                 rawVal = Math.sign(Math.sin(arg));
                                 break;
-                        }
-
-                        // Correction: If 'saw' and 'ramp' are distinct.
-                        // Let's refine:
-                        // Sawtooth (classic): rises linearly, drops instantly.
-                        // Ramp: often synonymous.
-                        // Maybe the user means Triangle? "Háromszög" is triangle.
-                        // "Fűrész" is Sawtooth. "Rámpa" is Ramp.
-                        // If I have both, maybe one is rising, one is falling.
-                        
-                        if (state.waveType === 'saw') {
-                             // Falling sawtooth
-                             const t = arg / (2 * Math.PI);
-                             rawVal = -2 * (t - Math.floor(t + 0.5));
                         }
                         
                         // For 'ramp' I used the rising code above.
@@ -374,6 +354,10 @@
                 }
                 
                 if (!hasActive) y = 0;
+                
+                // Add global offset
+                y += state.globalOffset;
+                
                 yValues.push(y);
             }
 
@@ -478,6 +462,15 @@
 
         yMinInput.addEventListener('change', requestUpdate);
         yMaxInput.addEventListener('change', requestUpdate);
+        
+        globalOffsetInput.addEventListener('change', (e) => {
+            let val = parseFloat(e.target.value);
+            if (val < -1) val = -1;
+            if (val > 1) val = 1;
+            state.globalOffset = val;
+            e.target.value = val;
+            requestUpdate();
+        });
 
         rangeMaxInput.addEventListener('change', (e) => {
             state.rangeMax = parseInt(e.target.value) || 100;
