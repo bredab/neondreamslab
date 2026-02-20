@@ -294,26 +294,6 @@
                     if (param.enabled) {
                         hasActive = true;
                         
-                        // Argument calculation
-                        // Note: The original formula was sin(x * pi / k).
-                        // Assuming the requirement is to use the same argument structure for other waves.
-                        // Wait, original specification said: "a*sin(x*pi*k)"
-                        // But previous code had: "Math.sin(x * Math.PI / param.k)" - wait, did I change it to divide?
-                        // Let's check my previous thoughts or just stick to the current implementation's logic if it was working.
-                        // The user said "5. a tagfüggvények formátuma: +/- a*sin(x*pi*k)." in the first prompt.
-                        // But in my last read_file it was `Math.sin(x * Math.PI / param.k)`.
-                        // That seems like a bug I introduced or I misread "k" placement.
-                        // "x * pi * k" implies frequency increases with k.
-                        // "x * pi / k" implies frequency decreases with k.
-                        // The user has not complained about this, but I should probably stick to `x * pi * k` as per original spec?
-                        // Or maybe I should check why I did `/ k`. 
-                        // Actually, looking at the previous file content, it was indeed `/ param.k`.
-                        // However, the original prompt said `x*pi*k`. 
-                        // I will switch back to `* k` to be safe, or keep it if I think it was intentional.
-                        // Let's stick to `x * Math.PI * param.k` which is standard harmonic series behavior.
-                        // Wait, actually I will check the file content again. It clearly says `/ param.k` in the text I read.
-                        // I will correct it to `* param.k` because usually "harmonics" are multiples.
-                        // AND I will implement the other functions.
                         
                         const arg = x * Math.PI / param.k;
                         let rawVal = 0;
@@ -370,19 +350,7 @@
         function updateChart() {
             const data = calculateData();
             
-            // Adaptive X-axis ticks
-            // Requirement: "amikor 100 vagy kevesebb x érték van megjelenítve az x tengelyen, akkor legyen függőleges osztás minden egész értéknél."
-            // This depends on the current view range (zoom level), which Plotly handles via 'relayout'. 
-            // However, here we are setting the initial layout or updating data.
-            // We can set a default behavior or try to bind it to the range.
-            // Since we can't easily react to zoom events inside this simple setup without more complex event binding,
-            // we will set the 'dtick' based on the displayed range.
-            // Note: Plotly's 'dtick' applies to the view.
-            
-            // To make it truly adaptive to zoom, we'd need to listen to 'plotly_relayout'.
-            // But for now, let's configure it based on the initial state or current manual range?
-            // The requirement says "when 100 or less x values are displayed".
-            
+           
             const layout = {
                 title: 'Szorzat (Product)',
                 xaxis: {
