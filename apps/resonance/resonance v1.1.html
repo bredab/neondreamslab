@@ -300,7 +300,7 @@
 
                         switch (state.waveType) {
                             case 'sin':
-                                rawVal = (param.k / (Math.PI * x)) * Math.sin(arg);
+                                rawVal = Math.sqrt(2) * Math.sin(arg);
                                 break;
                             case 'cos':
                                 rawVal = Math.cos(arg);
@@ -309,9 +309,10 @@
                                 // Triangle wave: 2 * abs(2 * (t - floor(t + 0.5))) - 1
                                 // Period 2PI
                                 {
-                                    const t = arg / (2 * Math.PI);
+                                    // Shifted by -0.25 to start at 0 (sine-like phase)
+                                    const t = arg / (2 * Math.PI) - 0.25;
                                     // Triangle wave (symmetric rise and fall)
-                                    rawVal = 2 * Math.abs(2 * (t - Math.floor(t + 0.5))) - 1;
+                                    rawVal = - 2 * Math.abs(2 * (t - Math.floor(t + 0.5))) + 1;
                                 }
                                 break;
                             case 'ramp':
@@ -387,21 +388,68 @@
                 }).then(attachZoomListener);
                 plotInitialized = true;
             } else {
+                // Determine current range to preserve zoom
+                const chartDiv = document.getElementById('chart-container');
+                let currentXRange = null;
+                if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
+                    currentXRange = chartDiv.layout.xaxis.range;
+                }
+
                 // If autoScale is off, we use manual range
                 const updateLayout = {
-                    'xaxis.range': [0, state.rangeMax], // Update scrollbar range
                     'yaxis.autorange': state.autoScale,
                     'yaxis.nticks': 20,
                     title: 'Szorzat (Product)'
                 };
                 
+                // Only update xaxis range if max range changed significantly or never set?
+                // Actually, Plotly React handles updates. If we don't supply xaxis.range, it might keep it or autorange.
+                // But we want to preserve the *current* zoom.
+                if (currentXRange) {
+                    updateLayout['xaxis.range'] = currentXRange;
+                } else {
+                    updateLayout['xaxis.range'] = [0, Math.min(100, state.rangeMax)];
+                }
+                
+                // Update slider range
+                updateLayout['xaxis.rangeslider'] = { range: [0, state.rangeMax] };
+
                 if (!state.autoScale) {
                     updateLayout['yaxis.range'] = [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)];
+                } else {
+                    // Adaptive Y-Zoom logic
+                    // If auto-scale is ON, we want to scale to the VISIBLE data.
+                    // But 'autorange: true' scales to ALL data.
+                    // We need to calculate the Y range for the current X range.
+                    if (currentXRange) {
+                        const xMin = currentXRange[0];
+                        const xMax = currentXRange[1];
+                        
+                        // Filter data
+                        let localMin = Infinity;
+                        let localMax = -Infinity;
+                        let hasPoints = false;
+
+                        for(let i=0; i<data.x.length; i++) {
+                            if (data.x[i] >= xMin && data.x[i] <= xMax) {
+                                if (data.y[i] < localMin) localMin = data.y[i];
+                                if (data.y[i] > localMax) localMax = data.y[i];
+                                hasPoints = true;
+                            }
+                        }
+                        
+                        if (hasPoints) {
+                            // Add some padding (e.g. 5%)
+                            const span = localMax - localMin;
+                            const padding = span === 0 ? 1 : span * 0.05;
+                            updateLayout['yaxis.range'] = [localMin - padding, localMax + padding];
+                            updateLayout['yaxis.autorange'] = false; // We set manual range dynamically
+                        }
+                    }
                 }
 
                 // Merge the new layout properties into the existing layout object for React
                 Object.assign(layout, updateLayout);
-                layout.yaxis.range = state.autoScale ? null : [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)];
                 
                 Plotly.react('chart-container', plotData, layout);
             }
@@ -463,25 +511,72 @@
         
         function attachZoomListener() {
             chartDiv.on('plotly_relayout', function(eventdata){
-                // Check if x-axis range changed
+                let update = {};
+                let x0, x1;
+                let xRangeChanged = false;
+
+                // Handle different ways Plotly reports range changes
                 if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
-                    const x0 = eventdata['xaxis.range[0]'];
-                    const x1 = eventdata['xaxis.range[1]'];
+                    x0 = eventdata['xaxis.range[0]'];
+                    x1 = eventdata['xaxis.range[1]'];
+                    xRangeChanged = true;
+                } else if (eventdata['xaxis.range'] && eventdata['xaxis.range'].length === 2) {
+                     x0 = eventdata['xaxis.range'][0];
+                     x1 = eventdata['xaxis.range'][1];
+                     xRangeChanged = true;
+                }
+
+                if (xRangeChanged) {
                     const diff = x1 - x0;
                     
-                    // Requirement: if <= 100, dtick = 1
+                    // Requirement 1: if <= 100, dtick = 1
                     if (diff <= 100) {
-                         Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
+                        update['xaxis.dtick'] = 1;
                     } else {
-                         Plotly.relayout(chartDiv, {'xaxis.dtick': null}); // auto
+                        update['xaxis.dtick'] = null; // auto
+                    }
+
+                    // Requirement 2: Adaptive Y Zoom
+                    if (state.autoScale) {
+                        // Access data from the plot
+                        const plotData = chartDiv.data[0];
+                        let localMin = Infinity;
+                        let localMax = -Infinity;
+                        let hasPoints = false;
+                        
+                        // Optimize loop?
+                        for(let i=0; i<plotData.x.length; i++) {
+                             const xv = plotData.x[i];
+                             if (xv >= x0 && xv <= x1) {
+                                 const yv = plotData.y[i];
+                                 if (yv < localMin) localMin = yv;
+                                 if (yv > localMax) localMax = yv;
+                                 hasPoints = true;
+                             }
+                        }
+                        
+                        if (hasPoints) {
+                            const span = localMax - localMin;
+                            const padding = span === 0 ? 1 : span * 0.05;
+                            update['yaxis.range'] = [localMin - padding, localMax + padding];
+                            update['yaxis.autorange'] = false;
+                        }
                     }
                 } else if (eventdata['xaxis.autorange'] === true) {
                      // Reset to default check
                      if (state.rangeMax <= 100) {
-                         Plotly.relayout(chartDiv, {'xaxis.dtick': 1});
+                         update['xaxis.dtick'] = 1;
                      } else {
-                         Plotly.relayout(chartDiv, {'xaxis.dtick': null});
+                         update['xaxis.dtick'] = null;
                      }
+                     if (state.autoScale) {
+                         update['yaxis.autorange'] = true;
+                     }
+                }
+
+                // Apply update if we have keys
+                if (Object.keys(update).length > 0) {
+                    Plotly.relayout(chartDiv, update);
                 }
             });
         }
