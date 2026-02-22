@@ -162,6 +162,11 @@
             </div>
 
             <div class="control-group">
+                <label for="steepness">Meredekség (1-30):</label>
+                <input type="number" id="steepness" value="10" min="1" max="30" style="width: 60px;">
+            </div>
+
+            <div class="control-group">
                 <label for="resolution">Felbontás (pont/egység):</label>
                 <input type="number" id="resolution" value="36" min="1" max="36">
             </div>
@@ -191,6 +196,7 @@
             })),
             waveType: 'sin',
             globalOffset: 0,
+            steepness: 10,
             autoScale: true,
             rangeMax: 30,
             resolution: 36
@@ -204,6 +210,7 @@
         const yMinInput = document.getElementById('y-min');
         const yMaxInput = document.getElementById('y-max');
         const globalOffsetInput = document.getElementById('global-offset');
+        const steepnessInput = document.getElementById('steepness');
         const rangeMaxInput = document.getElementById('range-max');
         const resolutionInput = document.getElementById('resolution');
         const updateBtn = document.getElementById('update-btn');
@@ -269,7 +276,7 @@
 
                         switch (state.waveType) {
                             case 'sin':
-                                rawVal = Math.sin(arg);
+                                rawVal = Math.tanh((param.k * 10) * Math.sin(arg));
                                 break;
                             case 'saw':
                                 // Triangle wave: 2 * abs(2 * (t - floor(t + 0.5))) - 1
@@ -289,7 +296,8 @@
                                 }
                                 break;
                             case 'sqr':
-                                rawVal = Math.sign(Math.sin(arg));
+                                // Soft square wave using tanh, steepness adjustable
+                                rawVal = Math.tanh((param.k * state.steepness) * Math.sin(arg));
                                 break;
                         }
                         
@@ -453,6 +461,15 @@
             if (val < -1) val = -1;
             if (val > 1) val = 1;
             state.globalOffset = val;
+            e.target.value = val;
+            requestUpdate();
+        });
+
+        steepnessInput.addEventListener('change', (e) => {
+            let val = parseInt(e.target.value) || 10;
+            if (val < 1) val = 1;
+            if (val > 30) val = 30;
+            state.steepness = val;
             e.target.value = val;
             requestUpdate();
         });
