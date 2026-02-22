@@ -136,7 +136,6 @@
                 <label for="wave-type">Függvény típus:</label>
                 <select id="wave-type">
                     <option value="sin">Szinusz (Sine)</option>
-                    <option value="cos">Koszinusz (Cosine)</option>
                     <option value="saw">Fűrész (Sawtooth)</option>
                     <option value="ramp">Rámpa (Ramp)</option>
                     <option value="sqr">Négyszög (Square)</option>
@@ -188,8 +187,7 @@
         const state = {
             params: Array.from({ length: 100 }, (_, i) => ({
                 k: i + 1,
-                enabled: i === 1, // Only k=2 enabled by default
-                a: 1.0
+                enabled: i === 1 // Only k=2 enabled by default
             })),
             waveType: 'sin',
             globalOffset: 0,
@@ -239,36 +237,7 @@
                 header.appendChild(label);
 
                 // Controls for 'a'
-                const controls = document.createElement('div');
-                controls.className = 'cell-controls';
-
-                const inputRow = document.createElement('div');
-                inputRow.className = 'input-row';
-
-                const aLabel = document.createElement('label');
-                aLabel.textContent = 'a:';
-
-                const aInput = document.createElement('input');
-                aInput.type = 'number';
-                aInput.value = param.a;
-                aInput.step = 0.1;
-                aInput.min = 0.01;
-                aInput.max = 100;
-                aInput.addEventListener('change', (e) => {
-                    let val = parseFloat(e.target.value);
-                    if (val < 0.01) val = 0.01;
-                    if (val > 100) val = 100;
-                    param.a = val;
-                    e.target.value = val;
-                    requestUpdate();
-                });
-
-                inputRow.appendChild(aLabel);
-                inputRow.appendChild(aInput);
-                controls.appendChild(inputRow);
-
                 cell.appendChild(header);
-                cell.appendChild(controls);
                 paramsGrid.appendChild(cell);
             });
         }
@@ -302,9 +271,6 @@
                             case 'sin':
                                 rawVal = Math.sin(arg);
                                 break;
-                            case 'cos':
-                                rawVal = Math.cos(arg);
-                                break;
                             case 'saw':
                                 // Triangle wave: 2 * abs(2 * (t - floor(t + 0.5))) - 1
                                 // Period 2PI
@@ -329,7 +295,7 @@
                         
                         // For 'ramp' I used the rising code above.
 
-                        const val = param.a * (rawVal + state.globalOffset);
+                        const val = rawVal + state.globalOffset;
                         y *= val;
                     }
                 }
@@ -391,8 +357,14 @@
                 // Determine current range to preserve zoom
                 const chartDiv = document.getElementById('chart-container');
                 let currentXRange = null;
+                
+                // Try reading from layout.xaxis.range (user set)
                 if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
                     currentXRange = chartDiv.layout.xaxis.range;
+                } 
+                // Fallback to _fullLayout (computed state, includes zoom)
+                else if (chartDiv._fullLayout && chartDiv._fullLayout.xaxis && chartDiv._fullLayout.xaxis.range) {
+                    currentXRange = chartDiv._fullLayout.xaxis.range;
                 }
 
                 // If autoScale is off, we use manual range
@@ -500,7 +472,6 @@
         resetBtn.addEventListener('click', () => {
             state.params.forEach((p, i) => {
                 p.enabled = i === 0;
-                p.a = 1.0;
             });
             initGrid();
             requestUpdate();
