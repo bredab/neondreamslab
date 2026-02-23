@@ -157,13 +157,8 @@
             </div>
 
             <div class="control-group">
-                <label for="global-offset">Y Offszet (+/- 1):</label>
-                <input type="number" id="global-offset" value="0" step="0.1" min="-1" max="1" style="width: 60px;">
-            </div>
-
-            <div class="control-group">
-                <label for="steepness">Meredekség (1-30):</label>
-                <input type="number" id="steepness" value="10" min="1" max="30" style="width: 60px;">
+                <label for="steepness">Meredekség (1-5):</label>
+                <input type="number" id="steepness" value="2" min="1" max="5" style="width: 60px;">
             </div>
 
             <div class="control-group">
@@ -195,8 +190,7 @@
                 enabled: i === 1 // Only k=2 enabled by default
             })),
             waveType: 'sin',
-            globalOffset: 0,
-            steepness: 10,
+            steepness: 2,
             autoScale: true,
             rangeMax: 30,
             resolution: 36
@@ -209,7 +203,6 @@
         const manualScaleControls = document.getElementById('manual-scale-controls');
         const yMinInput = document.getElementById('y-min');
         const yMaxInput = document.getElementById('y-max');
-        const globalOffsetInput = document.getElementById('global-offset');
         const steepnessInput = document.getElementById('steepness');
         const rangeMaxInput = document.getElementById('range-max');
         const resolutionInput = document.getElementById('resolution');
@@ -300,10 +293,7 @@
                                 break;
                         }
                         
-                        // For 'ramp' I used the rising code above.
-
-                        const val = rawVal + state.globalOffset;
-                        y *= val;
+                        y *= rawVal;
                     }
                 }
                 
@@ -454,15 +444,6 @@
 
         yMinInput.addEventListener('change', requestUpdate);
         yMaxInput.addEventListener('change', requestUpdate);
-        
-        globalOffsetInput.addEventListener('change', (e) => {
-            let val = parseFloat(e.target.value);
-            if (val < -1) val = -1;
-            if (val > 1) val = 1;
-            state.globalOffset = val;
-            e.target.value = val;
-            requestUpdate();
-        });
 
         steepnessInput.addEventListener('change', (e) => {
             let val = parseInt(e.target.value) || 10;
