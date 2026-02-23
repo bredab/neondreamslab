@@ -276,7 +276,7 @@
 
                         switch (state.waveType) {
                             case 'sin':
-                                rawVal = Math.tanh((param.k * 10) * Math.sin(arg));
+                                rawVal = Math.tanh((param.k * state.steepness) * Math.sin(arg));
                                 break;
                             case 'saw':
                                 // Triangle wave: 2 * abs(2 * (t - floor(t + 0.5))) - 1
@@ -296,8 +296,7 @@
                                 }
                                 break;
                             case 'sqr':
-                                // Soft square wave using tanh, steepness adjustable
-                                rawVal = Math.tanh((param.k * state.steepness) * Math.sin(arg));
+                                rawVal = Math.sign(Math.sin(arg));
                                 break;
                         }
                         
