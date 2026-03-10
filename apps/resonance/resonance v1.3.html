@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prime function v1.2</title>
+    <title>Prime function v1.3</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body {
@@ -50,7 +50,7 @@
             gap: 8px;
         }
 
-        select, input[type="number"] {
+        select, input[type="number"], input[type="range"] {
             padding: 6px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -72,49 +72,32 @@
 
         .params-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
         }
 
         .param-cell {
             background: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 4px;
-            padding: 8px;
+            padding: 6px;
             display: flex;
-            flex-direction: column;
-            gap: 5px;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85em;
         }
 
         .param-cell.disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             background: #eee;
         }
 
-        .cell-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-            font-size: 0.9em;
-        }
-
-        .cell-controls {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .input-row {
+        .param-cell label {
+            cursor: pointer;
             display: flex;
             align-items: center;
             gap: 5px;
-            font-size: 0.8em;
-        }
-
-        .input-row input[type="number"] {
             width: 100%;
-            padding: 2px 4px;
         }
         
         #chart-container {
@@ -125,22 +108,49 @@
             position: relative;
             min-height: 400px;
         }
+
+        .value-display {
+            font-weight: bold;
+            min-width: 35px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
-    <h1>Prime function v1.2</h1>
+    <h1>Prime function v1.3</h1>
 
     <div class="controls-container">
         <div class="global-controls">
             <div class="control-group">
-                <label for="wave-type">Függvény típus:</label>
+                <label for="wave-type">Típus:</label>
                 <select id="wave-type">
+                    <option value="exp">Exp Pulzus (Exp Pulse)</option>
                     <option value="sin">Szinusz (Sine)</option>
-                    <option value="tanhsin">Tanh Szinusz (Sine)</option>
+                    <option value="tanhsin">Tanh Szinusz (Tanh Sine)</option>
                     <option value="saw">Fűrész (Sawtooth)</option>
                     <option value="ramp">Rámpa (Ramp)</option>
                     <option value="sqr">Négyszög (Square)</option>
                 </select>
+            </div>
+
+            <div class="control-group">
+                <label for="operation">Művelet:</label>
+                <select id="operation">
+                    <option value="sum">Összeg (Sum)</option>
+                    <option value="product">Szorzat (Product)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="global-a">Amplitúdó (a):</label>
+                <input type="range" id="global-a" min="0" max="1" step="0.01" value="0.4">
+                <span id="a-val" class="value-display">0.40</span>
+            </div>
+
+            <div class="control-group">
+                <label for="global-k">Élesség (k):</label>
+                <input type="range" id="global-k" min="1" max="100" step="1" value="2">
+                <span id="k-val" class="value-display">2</span>
             </div>
             
             <div class="control-group">
@@ -158,18 +168,13 @@
             </div>
 
             <div class="control-group">
-                <label for="steepness">Meredekség (1-5):</label>
-                <input type="number" id="steepness" value="2" min="1" max="5" style="width: 60px;">
-            </div>
-
-            <div class="control-group">
-                <label for="resolution">Felbontás (pont/egység):</label>
-                <input type="number" id="resolution" value="36" min="1" max="36">
+                <label for="resolution">Felbontás:</label>
+                <input type="number" id="resolution" value="36" min="1" max="100" style="width: 50px;">
             </div>
 
             <div class="control-group">
                 <label for="range-max">X Max:</label>
-                <input type="number" id="range-max" value="30" min="10" max="100000">
+                <input type="number" id="range-max" value="30" min="10" max="100000" style="width: 80px;">
             </div>
 
             <button id="update-btn">Frissítés</button>
@@ -187,11 +192,13 @@
         // State management
         const state = {
             params: Array.from({ length: 100 }, (_, i) => ({
-                k: i + 1,
-                enabled: i === 1 // Only k=2 enabled by default
+                p: i + 1, // Period value (fixed by index initially)
+                enabled: i === 1 // Only p=2 enabled by default
             })),
-            waveType: 'sin',
-            steepness: 2,
+            waveType: 'exp',
+            operation: 'sum',
+            globalA: 0.4,
+            globalK: 2,
             autoScale: true,
             rangeMax: 30,
             resolution: 36
@@ -200,11 +207,15 @@
         // DOM Elements
         const paramsGrid = document.getElementById('params-grid');
         const waveTypeSelect = document.getElementById('wave-type');
+        const operationSelect = document.getElementById('operation');
+        const globalAInput = document.getElementById('global-a');
+        const globalKInput = document.getElementById('global-k');
+        const aValDisplay = document.getElementById('a-val');
+        const kValDisplay = document.getElementById('k-val');
         const autoScaleCheckbox = document.getElementById('auto-scale');
         const manualScaleControls = document.getElementById('manual-scale-controls');
         const yMinInput = document.getElementById('y-min');
         const yMaxInput = document.getElementById('y-max');
-        const steepnessInput = document.getElementById('steepness');
         const rangeMaxInput = document.getElementById('range-max');
         const resolutionInput = document.getElementById('resolution');
         const updateBtn = document.getElementById('update-btn');
@@ -216,11 +227,8 @@
             state.params.forEach((param, index) => {
                 const cell = document.createElement('div');
                 cell.className = `param-cell ${param.enabled ? '' : 'disabled'}`;
-                cell.dataset.index = index;
-
-                // Header with Checkbox and k value
-                const header = document.createElement('div');
-                header.className = 'cell-header';
+                
+                const label = document.createElement('label');
                 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
@@ -231,14 +239,12 @@
                     requestUpdate();
                 });
 
-                const label = document.createElement('span');
-                label.textContent = `k = ${param.k}`;
+                const span = document.createElement('span');
+                span.textContent = `p = ${param.p}`;
 
-                header.appendChild(checkbox);
-                header.appendChild(label);
-
-                // Controls for 'a'
-                cell.appendChild(header);
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                cell.appendChild(label);
                 paramsGrid.appendChild(cell);
             });
         }
@@ -248,63 +254,67 @@
             const xValues = [];
             const yValues = [];
             
-            // Calculate step size based on resolution
-            // Higher resolution = more points per unit
             const step = 1 / state.resolution;
             const max = state.rangeMax;
+            const a = state.globalA;
+            const k = state.globalK;
             
-            // Generate X values
             for (let x = 0; x <= max; x += step) {
                 xValues.push(x);
                 
-                let y = 1;
+                let y = (state.operation === 'product') ? 1 : 0;
                 let hasActive = false;
 
                 for (const param of state.params) {
                     if (param.enabled) {
                         hasActive = true;
                         
-                        
-                        const arg = x * Math.PI / param.k;
-                        let rawVal = 0;
+                        const Pi = param.p;
+                        const arg = x * Math.PI / Pi;
+                        let val = 0;
 
                         switch (state.waveType) {
+                            case 'exp':
+                                // a * p * e^(-k * sin^2(x*pi/p))
+                                val = a * Pi * Math.exp(-k * Math.pow(Math.sin(arg), 2));
+                                break;
                             case 'sin':
-                                rawVal = 0.4 * param.k * Math.sin(arg);
-
+                                // a * p * sin(x*pi/p)
+                                val = a * Pi * Math.sin(arg);
                                 break;
                             case 'tanhsin':
-                                rawVal = Math.tanh((param.k * state.steepness) * Math.sin(arg));
-
+                                // a * p * tanh(k * sin(x*pi/p))
+                                val = a * Pi * Math.tanh(k * Math.sin(arg));
                                 break;
                             case 'saw':
-                                // Triangle wave: 2 * abs(2 * (t - floor(t + 0.5))) - 1
-                                // Period 2PI
+                                // Symmetric Triangle scaled by a*p
                                 {
-                                    // Shifted by -0.25 to start at 0 (sine-like phase)
                                     const t = arg / (2 * Math.PI) - 0.25;
-                                    // Triangle wave (symmetric rise and fall)
-                                    rawVal = - 2 * Math.abs(2 * (t - Math.floor(t + 0.5))) + 1;
+                                    val = a * Pi * (-2 * Math.abs(2 * (t - Math.floor(t + 0.5))) + 1);
                                 }
                                 break;
                             case 'ramp':
-                                // Ramp (rising sawtooth)
+                                // Ramp scaled by a*p
                                 {
                                     const t = arg / (2 * Math.PI);
-                                    rawVal = 2 * (t - Math.floor(t + 0.5));
+                                    val = a * Pi * (2 * (t - Math.floor(t + 0.5)));
                                 }
                                 break;
                             case 'sqr':
-                                rawVal = Math.sign(Math.sin(arg));
+                                // Square scaled by a*p
+                                val = a * Pi * Math.sign(Math.sin(arg));
                                 break;
                         }
                         
-                        y *= rawVal;
+                        if (state.operation === 'product') {
+                            y *= val;
+                        } else {
+                            y += val;
+                        }
                     }
                 }
                 
                 if (!hasActive) y = 0;
-                
                 yValues.push(y);
             }
 
@@ -317,14 +327,12 @@
         function updateChart() {
             const data = calculateData();
             
-           
             const layout = {
-                title: 'Szorzat (Product)',
+                title: state.operation === 'product' ? 'Szorzatfüggvény' : 'Összegfüggvény',
                 xaxis: {
                     title: 'x',
-                    range: [0, Math.min(100, state.rangeMax)], // Initial zoom
+                    range: [0, Math.min(100, state.rangeMax)],
                     rangeslider: { visible: true },
-                    // If the initial range is <= 100, force dtick: 1
                     dtick: (Math.min(100, state.rangeMax) <= 100) ? 1 : undefined, 
                     gridcolor: '#eee',
                     zerolinecolor: '#999'
@@ -346,7 +354,9 @@
                 y: data.y,
                 mode: 'lines',
                 type: 'scatter',
-                line: { width: 1.5 }
+                line: { width: 1.5, color: '#007bff' },
+                fill: state.operation === 'sum' ? 'tozeroy' : 'none',
+                fillcolor: 'rgba(0, 123, 255, 0.1)'
             }];
 
             if (!plotInitialized) {
@@ -357,88 +367,85 @@
                 }).then(attachZoomListener);
                 plotInitialized = true;
             } else {
-                // Determine current range to preserve zoom
                 const chartDiv = document.getElementById('chart-container');
                 let currentXRange = null;
                 
-                // Try reading from layout.xaxis.range (user set)
                 if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
                     currentXRange = chartDiv.layout.xaxis.range;
-                } 
-                // Fallback to _fullLayout (computed state, includes zoom)
-                else if (chartDiv._fullLayout && chartDiv._fullLayout.xaxis && chartDiv._fullLayout.xaxis.range) {
+                } else if (chartDiv._fullLayout && chartDiv._fullLayout.xaxis && chartDiv._fullLayout.xaxis.range) {
                     currentXRange = chartDiv._fullLayout.xaxis.range;
                 }
 
-                // If autoScale is off, we use manual range
                 const updateLayout = {
                     'yaxis.autorange': state.autoScale,
-                    'yaxis.nticks': 20,
-                    title: 'Szorzat (Product)'
+                    title: state.operation === 'product' ? 'Szorzatfüggvény' : 'Összegfüggvény'
                 };
                 
-                // Only update xaxis range if max range changed significantly or never set?
-                // Actually, Plotly React handles updates. If we don't supply xaxis.range, it might keep it or autorange.
-                // But we want to preserve the *current* zoom.
                 if (currentXRange) {
                     updateLayout['xaxis.range'] = currentXRange;
                 } else {
                     updateLayout['xaxis.range'] = [0, Math.min(100, state.rangeMax)];
                 }
                 
-                // Update slider range
                 updateLayout['xaxis.rangeslider'] = { range: [0, state.rangeMax] };
 
                 if (!state.autoScale) {
                     updateLayout['yaxis.range'] = [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)];
-                } else {
-                    // Adaptive Y-Zoom logic
-                    // If auto-scale is ON, we want to scale to the VISIBLE data.
-                    // But 'autorange: true' scales to ALL data.
-                    // We need to calculate the Y range for the current X range.
-                    if (currentXRange) {
-                        const xMin = currentXRange[0];
-                        const xMax = currentXRange[1];
-                        
-                        // Filter data
-                        let localMin = Infinity;
-                        let localMax = -Infinity;
-                        let hasPoints = false;
+                } else if (currentXRange) {
+                    // Adaptive Y zoom for visible data
+                    const xMin = currentXRange[0];
+                    const xMax = currentXRange[1];
+                    let localMin = Infinity;
+                    let localMax = -Infinity;
+                    let hasPoints = false;
 
-                        for(let i=0; i<data.x.length; i++) {
-                            if (data.x[i] >= xMin && data.x[i] <= xMax) {
-                                if (data.y[i] < localMin) localMin = data.y[i];
-                                if (data.y[i] > localMax) localMax = data.y[i];
-                                hasPoints = true;
-                            }
+                    for(let i=0; i<data.x.length; i++) {
+                        if (data.x[i] >= xMin && data.x[i] <= xMax) {
+                            if (data.y[i] < localMin) localMin = data.y[i];
+                            if (data.y[i] > localMax) localMax = data.y[i];
+                            hasPoints = true;
                         }
-                        
-                        if (hasPoints) {
-                            // Add some padding (e.g. 5%)
-                            const span = localMax - localMin;
-                            const padding = span === 0 ? 1 : span * 0.05;
-                            updateLayout['yaxis.range'] = [localMin - padding, localMax + padding];
-                            updateLayout['yaxis.autorange'] = false; // We set manual range dynamically
-                        }
+                    }
+                    
+                    if (hasPoints) {
+                        const span = localMax - localMin;
+                        const padding = span === 0 ? 1 : Math.abs(span) * 0.05;
+                        updateLayout['yaxis.range'] = [localMin - padding, localMax + padding];
+                        updateLayout['yaxis.autorange'] = false;
                     }
                 }
 
-                // Merge the new layout properties into the existing layout object for React
                 Object.assign(layout, updateLayout);
-                
                 Plotly.react('chart-container', plotData, layout);
             }
         }
 
-        // Event Listeners & Updates
+        // Event Listeners
         let updateTimeout;
         function requestUpdate() {
             clearTimeout(updateTimeout);
-            updateTimeout = setTimeout(updateChart, 100); // Debounce
+            updateTimeout = setTimeout(updateChart, 50);
         }
 
         waveTypeSelect.addEventListener('change', (e) => {
             state.waveType = e.target.value;
+            requestUpdate();
+        });
+
+        operationSelect.addEventListener('change', (e) => {
+            state.operation = e.target.value;
+            requestUpdate();
+        });
+
+        globalAInput.addEventListener('input', (e) => {
+            state.globalA = parseFloat(e.target.value);
+            aValDisplay.textContent = state.globalA.toFixed(2);
+            requestUpdate();
+        });
+
+        globalKInput.addEventListener('input', (e) => {
+            state.globalK = parseInt(e.target.value);
+            kValDisplay.textContent = state.globalK;
             requestUpdate();
         });
 
@@ -450,15 +457,6 @@
 
         yMinInput.addEventListener('change', requestUpdate);
         yMaxInput.addEventListener('change', requestUpdate);
-
-        steepnessInput.addEventListener('change', (e) => {
-            let val = parseInt(e.target.value) || 10;
-            if (val < 1) val = 1;
-            if (val > 30) val = 30;
-            state.steepness = val;
-            e.target.value = val;
-            requestUpdate();
-        });
 
         rangeMaxInput.addEventListener('change', (e) => {
             state.rangeMax = parseInt(e.target.value) || 100;
@@ -474,22 +472,31 @@
 
         resetBtn.addEventListener('click', () => {
             state.params.forEach((p, i) => {
-                p.enabled = i === 0;
+                p.enabled = i === 1; // Default k=2 active
             });
+            state.globalA = 0.4;
+            state.globalK = 2;
+            state.waveType = 'exp';
+            state.operation = 'sum';
+            
+            globalAInput.value = 0.4;
+            aValDisplay.textContent = "0.40";
+            globalKInput.value = 2;
+            kValDisplay.textContent = "2";
+            waveTypeSelect.value = 'exp';
+            operationSelect.value = 'sum';
+            
             initGrid();
             requestUpdate();
         });
         
-        // Add listener for zoom events to update tick density
         const chartDiv = document.getElementById('chart-container');
-        
         function attachZoomListener() {
             chartDiv.on('plotly_relayout', function(eventdata){
                 let update = {};
                 let x0, x1;
                 let xRangeChanged = false;
 
-                // Handle different ways Plotly reports range changes
                 if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
                     x0 = eventdata['xaxis.range[0]'];
                     x1 = eventdata['xaxis.range[1]'];
@@ -501,24 +508,18 @@
                 }
 
                 if (xRangeChanged) {
-                    const diff = x1 - x0;
-                    
-                    // Requirement 1: if <= 100, dtick = 1
-                    if (diff <= 100) {
+                    if ((x1 - x0) <= 100) {
                         update['xaxis.dtick'] = 1;
                     } else {
-                        update['xaxis.dtick'] = null; // auto
+                        update['xaxis.dtick'] = null;
                     }
 
-                    // Requirement 2: Adaptive Y Zoom
                     if (state.autoScale) {
-                        // Access data from the plot
                         const plotData = chartDiv.data[0];
                         let localMin = Infinity;
                         let localMax = -Infinity;
                         let hasPoints = false;
                         
-                        // Optimize loop?
                         for(let i=0; i<plotData.x.length; i++) {
                              const xv = plotData.x[i];
                              if (xv >= x0 && xv <= x1) {
@@ -531,24 +532,13 @@
                         
                         if (hasPoints) {
                             const span = localMax - localMin;
-                            const padding = span === 0 ? 1 : span * 0.05;
+                            const padding = span === 0 ? 1 : Math.abs(span) * 0.05;
                             update['yaxis.range'] = [localMin - padding, localMax + padding];
                             update['yaxis.autorange'] = false;
                         }
                     }
-                } else if (eventdata['xaxis.autorange'] === true) {
-                     // Reset to default check
-                     if (state.rangeMax <= 100) {
-                         update['xaxis.dtick'] = 1;
-                     } else {
-                         update['xaxis.dtick'] = null;
-                     }
-                     if (state.autoScale) {
-                         update['yaxis.autorange'] = true;
-                     }
                 }
-
-                // Apply update if we have keys
+                
                 if (Object.keys(update).length > 0) {
                     Plotly.relayout(chartDiv, update);
                 }
@@ -558,7 +548,6 @@
         // Init
         initGrid();
         updateChart();
-
     </script>
 </body>
 </html>
