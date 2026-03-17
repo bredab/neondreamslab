@@ -126,6 +126,7 @@
                 <select id="wave-type">
                     <option value="exp">Exp Pulzus (Exp Pulse)</option>
                     <option value="sin">Szinusz (Sine)</option>
+                    <option value="cos">Koszinusz (Cosine)</option>
                     <option value="tanhsin">Tanh Szinusz (Tanh Sine)</option>
                     <option value="saw">Fűrész (Sawtooth)</option>
                     <option value="ramp">Rámpa (Ramp)</option>
@@ -143,14 +144,28 @@
 
             <div class="control-group">
                 <label for="global-a">Amplitúdó (a):</label>
-                <input type="range" id="global-a" min="0" max="1" step="0.01" value="0.4">
-                <span id="a-val" class="value-display">0.40</span>
+                <input type="range" id="global-a" min="0" max="1" step="0.01" value="1.0">
+                <span id="a-val" class="value-display">1.00</span>
             </div>
 
             <div class="control-group">
                 <label for="global-k">Élesség (k):</label>
-                <input type="range" id="global-k" min="1" max="100" step="1" value="2">
-                <span id="k-val" class="value-display">2</span>
+                <input type="range" id="global-k" min="1" max="100" step="1" value="1">
+                <span id="k-val" class="value-display">1</span>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="use-p-multiplier" checked>
+                    P szorzó
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="show-square">
+                    Négyzet ($y^2$)
+                </label>
             </div>
             
             <div class="control-group">
@@ -169,7 +184,7 @@
 
             <div class="control-group">
                 <label for="resolution">Felbontás:</label>
-                <input type="number" id="resolution" value="36" min="1" max="100" style="width: 50px;">
+                <input type="number" id="resolution" value="10" min="1" max="100" style="width: 50px;">
             </div>
 
             <div class="control-group">
@@ -193,15 +208,17 @@
         const state = {
             params: Array.from({ length: 90 }, (_, i) => ({
                 p: i + 1, // Period value (fixed by index initially)
-                enabled: i === 1 // Only p=2 enabled by default
+                enabled: i === 0 // Only p=1 enabled by default
             })),
             waveType: 'exp',
             operation: 'sum',
-            globalA: 0.4,
-            globalK: 2,
+            globalA: 1.0,
+            globalK: 1,
+            usePMultiplier: true,
+            showSquare: false,
             autoScale: true,
             rangeMax: 30,
-            resolution: 36
+            resolution: 10
         };
 
         // DOM Elements
@@ -212,6 +229,8 @@
         const globalKInput = document.getElementById('global-k');
         const aValDisplay = document.getElementById('a-val');
         const kValDisplay = document.getElementById('k-val');
+        const usePCheckbox = document.getElementById('use-p-multiplier');
+        const showSquareCheckbox = document.getElementById('show-square');
         const autoScaleCheckbox = document.getElementById('auto-scale');
         const manualScaleControls = document.getElementById('manual-scale-controls');
         const yMinInput = document.getElementById('y-min');
@@ -251,71 +270,56 @@
 
         // Calculation Logic
         function calculateData() {
-            const xValues = [];
-            const yValues = [];
+            const numPoints = Math.floor(state.rangeMax * state.resolution) + 1;
+            const xValues = new Float64Array(numPoints);
+            const yValues = new Float64Array(numPoints);
             
             const step = 1 / state.resolution;
-            const max = state.rangeMax;
             const a = state.globalA;
             const k = state.globalK;
+            const useP = state.usePMultiplier;
+            const showSquare = state.showSquare;
+            const enabledParams = state.params.filter(p => p.enabled);
+            const isProduct = state.operation === 'product';
+            const waveType = state.waveType;
             
-            for (let x = 0; x <= max; x += step) {
-                xValues.push(x);
+            // Optimization: avoid switch-case in the loop by choosing the function once
+            let waveFunc;
+            switch (waveType) {
+                case 'exp': waveFunc = (arg, Pi) => a * (useP ? Pi : 1) * Math.exp(-k * Math.pow(Math.sin(arg), 2)); break;
+                case 'sin': waveFunc = (arg, Pi) => a * (useP ? Pi : 1) * Math.sin(arg); break;
+                case 'cos': waveFunc = (arg, Pi) => a * (useP ? Pi : 1) * Math.cos(arg); break;
+                case 'tanhsin': waveFunc = (arg, Pi) => a * (useP ? Pi : 1) * Math.tanh(k * Math.sin(arg)); break;
+                case 'saw': waveFunc = (arg, Pi) => {
+                    const t = arg / (2 * Math.PI) - 0.25;
+                    return a * (useP ? Pi : 1) * (-2 * Math.abs(2 * (t - Math.floor(t + 0.5))) + 1);
+                }; break;
+                case 'ramp': waveFunc = (arg, Pi) => {
+                    const t = arg / (2 * Math.PI);
+                    return a * (useP ? Pi : 1) * (2 * (t - Math.floor(t + 0.5)));
+                }; break;
+                case 'sqr': waveFunc = (arg, Pi) => a * (useP ? Pi : 1) * Math.sign(Math.sin(arg)); break;
+                default: waveFunc = () => 0;
+            }
+
+            for (let i = 0; i < numPoints; i++) {
+                const x = i * step;
+                xValues[i] = x;
                 
-                let y = (state.operation === 'product') ? 1 : 0;
-                let hasActive = false;
+                let y = isProduct ? 1 : 0;
+                
+                if (enabledParams.length === 0) {
+                    yValues[i] = 0;
+                    continue;
+                }
 
-                for (const param of state.params) {
-                    if (param.enabled) {
-                        hasActive = true;
-                        
-                        const Pi = param.p;
-                        const arg = x * Math.PI / Pi;
-                        let val = 0;
-
-                        switch (state.waveType) {
-                            case 'exp':
-                                // a * p * e^(-k * sin^2(x*pi/p))
-                                val = a * Pi * Math.exp(-k * Math.pow(Math.sin(arg), 2));
-                                break;
-                            case 'sin':
-                                // a * p * sin(x*pi/p)
-                                val = a * Pi * Math.sin(arg);
-                                break;
-                            case 'tanhsin':
-                                // a * p * tanh(k * sin(x*pi/p))
-                                val = a * Pi * Math.tanh(k * Math.sin(arg));
-                                break;
-                            case 'saw':
-                                // Symmetric Triangle scaled by a*p
-                                {
-                                    const t = arg / (2 * Math.PI) - 0.25;
-                                    val = a * Pi * (-2 * Math.abs(2 * (t - Math.floor(t + 0.5))) + 1);
-                                }
-                                break;
-                            case 'ramp':
-                                // Ramp scaled by a*p
-                                {
-                                    const t = arg / (2 * Math.PI);
-                                    val = a * Pi * (2 * (t - Math.floor(t + 0.5)));
-                                }
-                                break;
-                            case 'sqr':
-                                // Square scaled by a*p
-                                val = a * Pi * Math.sign(Math.sin(arg));
-                                break;
-                        }
-                        
-                        if (state.operation === 'product') {
-                            y *= val;
-                        } else {
-                            y += val;
-                        }
-                    }
+                for (let j = 0; j < enabledParams.length; j++) {
+                    const Pi = enabledParams[j].p;
+                    const val = waveFunc(x * Math.PI / Pi, Pi);
+                    if (isProduct) y *= val; else y += val;
                 }
                 
-                if (!hasActive) y = 0;
-                yValues.push(y);
+                yValues[i] = showSquare ? (y * y) : y;
             }
 
             return { x: xValues, y: yValues };
@@ -326,14 +330,20 @@
 
         function updateChart() {
             const data = calculateData();
+            const defaultXRange = [0, Math.min(100, state.rangeMax)];
             
+            let chartTitle = state.operation === 'product' ? 'Szorzatfüggvény' : 'Összegfüggvény';
+            if (state.showSquare) chartTitle += ' (Négyzet)';
+
             const layout = {
-                title: state.operation === 'product' ? 'Szorzatfüggvény' : 'Összegfüggvény',
+                title: chartTitle,
                 xaxis: {
                     title: 'x',
-                    range: [0, Math.min(100, state.rangeMax)],
-                    rangeslider: { visible: true },
-                    dtick: (Math.min(100, state.rangeMax) <= 100) ? 1 : undefined, 
+                    range: defaultXRange,
+                    rangeslider: { 
+                        visible: true,
+                        thickness: 0.1
+                    },
                     gridcolor: '#eee',
                     zerolinecolor: '#999'
                 },
@@ -341,7 +351,7 @@
                     title: 'y',
                     autorange: state.autoScale,
                     range: state.autoScale ? null : [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)],
-                    nticks: 20,
+                    nticks: 15,
                     gridcolor: '#eee',
                     zerolinecolor: '#999'
                 },
@@ -353,7 +363,7 @@
                 x: data.x,
                 y: data.y,
                 mode: 'lines',
-                type: 'scatter',
+                type: 'scattergl',
                 line: { width: 1.5, color: '#007bff' },
                 fill: state.operation === 'sum' ? 'tozeroy' : 'none',
                 fillcolor: 'rgba(0, 123, 255, 0.1)'
@@ -376,46 +386,52 @@
                     currentXRange = chartDiv._fullLayout.xaxis.range;
                 }
 
-                const updateLayout = {
-                    'yaxis.autorange': state.autoScale,
-                    title: state.operation === 'product' ? 'Szorzatfüggvény' : 'Összegfüggvény'
-                };
-                
+                // Preserve current zoom level
                 if (currentXRange) {
-                    updateLayout['xaxis.range'] = currentXRange;
-                } else {
-                    updateLayout['xaxis.range'] = [0, Math.min(100, state.rangeMax)];
+                    layout.xaxis.range = currentXRange;
                 }
                 
-                updateLayout['xaxis.rangeslider'] = { range: [0, state.rangeMax] };
+                // Set adaptive tick density based on preserved or default range
+                const visibleDiff = (layout.xaxis.range[1] - layout.xaxis.range[0]);
+                if (visibleDiff <= 40) {
+                    layout.xaxis.dtick = 1;
+                    layout.xaxis.nticks = undefined;
+                } else {
+                    layout.xaxis.dtick = undefined;
+                    layout.xaxis.nticks = 20;
+                }
 
                 if (!state.autoScale) {
-                    updateLayout['yaxis.range'] = [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)];
+                    layout.yaxis.range = [parseFloat(yMinInput.value), parseFloat(yMaxInput.value)];
+                    layout.yaxis.autorange = false;
                 } else if (currentXRange) {
-                    // Adaptive Y zoom for visible data
+                    // Optimized Adaptive Y zoom for visible data using index lookup
                     const xMin = currentXRange[0];
                     const xMax = currentXRange[1];
+                    const resolution = state.resolution;
+                    
+                    let startIdx = Math.max(0, Math.floor(xMin * resolution));
+                    let endIdx = Math.min(data.x.length - 1, Math.ceil(xMax * resolution));
+                    
                     let localMin = Infinity;
                     let localMax = -Infinity;
                     let hasPoints = false;
 
-                    for(let i=0; i<data.x.length; i++) {
-                        if (data.x[i] >= xMin && data.x[i] <= xMax) {
-                            if (data.y[i] < localMin) localMin = data.y[i];
-                            if (data.y[i] > localMax) localMax = data.y[i];
-                            hasPoints = true;
-                        }
+                    for(let i = startIdx; i <= endIdx; i++) {
+                        const val = data.y[i];
+                        if (val < localMin) localMin = val;
+                        if (val > localMax) localMax = val;
+                        hasPoints = true;
                     }
                     
                     if (hasPoints) {
                         const span = localMax - localMin;
                         const padding = span === 0 ? 1 : Math.abs(span) * 0.05;
-                        updateLayout['yaxis.range'] = [localMin - padding, localMax + padding];
-                        updateLayout['yaxis.autorange'] = false;
+                        layout.yaxis.range = [localMin - padding, localMax + padding];
+                        layout.yaxis.autorange = false;
                     }
                 }
 
-                Object.assign(layout, updateLayout);
                 Plotly.react('chart-container', plotData, layout);
             }
         }
@@ -449,6 +465,16 @@
             requestUpdate();
         });
 
+        usePCheckbox.addEventListener('change', (e) => {
+            state.usePMultiplier = e.target.checked;
+            requestUpdate();
+        });
+
+        showSquareCheckbox.addEventListener('change', (e) => {
+            state.showSquare = e.target.checked;
+            requestUpdate();
+        });
+
         autoScaleCheckbox.addEventListener('change', (e) => {
             state.autoScale = e.target.checked;
             manualScaleControls.style.display = state.autoScale ? 'none' : 'flex';
@@ -472,17 +498,21 @@
 
         resetBtn.addEventListener('click', () => {
             state.params.forEach((p, i) => {
-                p.enabled = i === 1; // Default k=2 active
+                p.enabled = i === 0; // Default p=1 active
             });
-            state.globalA = 0.4;
-            state.globalK = 2;
+            state.globalA = 1.0;
+            state.globalK = 1;
+            state.usePMultiplier = true;
+            state.showSquare = false;
             state.waveType = 'exp';
             state.operation = 'sum';
             
-            globalAInput.value = 0.4;
-            aValDisplay.textContent = "0.40";
-            globalKInput.value = 2;
-            kValDisplay.textContent = "2";
+            globalAInput.value = 1.0;
+            aValDisplay.textContent = "1.00";
+            globalKInput.value = 1;
+            kValDisplay.textContent = "1";
+            usePCheckbox.checked = true;
+            showSquareCheckbox.checked = false;
             waveTypeSelect.value = 'exp';
             operationSelect.value = 'sum';
             
@@ -491,57 +521,74 @@
         });
         
         const chartDiv = document.getElementById('chart-container');
+        let relayoutTimeout = null;
+
         function attachZoomListener() {
             chartDiv.on('plotly_relayout', function(eventdata){
-                let update = {};
-                let x0, x1;
-                let xRangeChanged = false;
+                // Debounce relayout to prevent axis label lag
+                if (relayoutTimeout) return;
+                
+                relayoutTimeout = requestAnimationFrame(() => {
+                    let update = {};
+                    let x0, x1;
+                    let xRangeChanged = false;
 
-                if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
-                    x0 = eventdata['xaxis.range[0]'];
-                    x1 = eventdata['xaxis.range[1]'];
-                    xRangeChanged = true;
-                } else if (eventdata['xaxis.range'] && eventdata['xaxis.range'].length === 2) {
-                     x0 = eventdata['xaxis.range'][0];
-                     x1 = eventdata['xaxis.range'][1];
-                     xRangeChanged = true;
-                }
-
-                if (xRangeChanged) {
-                    if ((x1 - x0) <= 100) {
-                        update['xaxis.dtick'] = 1;
-                    } else {
-                        update['xaxis.dtick'] = null;
+                    if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
+                        x0 = eventdata['xaxis.range[0]'];
+                        x1 = eventdata['xaxis.range[1]'];
+                        xRangeChanged = true;
+                    } else if (eventdata['xaxis.range'] && eventdata['xaxis.range'].length === 2) {
+                         x0 = eventdata['xaxis.range'][0];
+                         x1 = eventdata['xaxis.range'][1];
+                         xRangeChanged = true;
                     }
 
-                    if (state.autoScale) {
-                        const plotData = chartDiv.data[0];
-                        let localMin = Infinity;
-                        let localMax = -Infinity;
-                        let hasPoints = false;
-                        
-                        for(let i=0; i<plotData.x.length; i++) {
-                             const xv = plotData.x[i];
-                             if (xv >= x0 && xv <= x1) {
+                    if (xRangeChanged) {
+                        const diff = x1 - x0;
+                        // Adaptive tick density: only show integer ticks when zoomed in enough
+                        if (diff <= 40) {
+                            update['xaxis.dtick'] = 1;
+                            update['xaxis.nticks'] = undefined;
+                        } else {
+                            update['xaxis.dtick'] = undefined;
+                            update['xaxis.nticks'] = 20;
+                        }
+
+                        if (state.autoScale) {
+                            const plotData = chartDiv.data[0];
+                            const resolution = state.resolution;
+                            
+                            let startIdx = Math.max(0, Math.floor(x0 * resolution));
+                            let endIdx = Math.min(plotData.x.length - 1, Math.ceil(x1 * resolution));
+                            
+                            let localMin = Infinity;
+                            let localMax = -Infinity;
+                            let hasPoints = false;
+                            
+                            for(let i = startIdx; i <= endIdx; i++) {
                                  const yv = plotData.y[i];
                                  if (yv < localMin) localMin = yv;
                                  if (yv > localMax) localMax = yv;
                                  hasPoints = true;
-                             }
-                        }
-                        
-                        if (hasPoints) {
-                            const span = localMax - localMin;
-                            const padding = span === 0 ? 1 : Math.abs(span) * 0.05;
-                            update['yaxis.range'] = [localMin - padding, localMax + padding];
-                            update['yaxis.autorange'] = false;
+                            }
+                            
+                            if (hasPoints) {
+                                const span = localMax - localMin;
+                                const padding = span === 0 ? 1 : Math.abs(span) * 0.05;
+                                update['yaxis.range'] = [localMin - padding, localMax + padding];
+                                update['yaxis.autorange'] = false;
+                            }
                         }
                     }
-                }
-                
-                if (Object.keys(update).length > 0) {
-                    Plotly.relayout(chartDiv, update);
-                }
+                    
+                    if (Object.keys(update).length > 0) {
+                        Plotly.relayout(chartDiv, update).then(() => {
+                            relayoutTimeout = null;
+                        });
+                    } else {
+                        relayoutTimeout = null;
+                    }
+                });
             });
         }
 
