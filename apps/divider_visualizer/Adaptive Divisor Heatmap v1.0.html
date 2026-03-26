@@ -205,6 +205,9 @@
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="checkAlternating" onchange="drawGrid()"> Alternating Layout (Boustrophedon)
                 </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="checkLinearColor" onchange="drawGrid()"> Linear Color Scale (Default: Log)
+                </label>
             </div>
 
             <!-- Buttons -->
@@ -265,6 +268,7 @@
         
         const checkSieve = document.getElementById('checkSieve');
         const checkAlternating = document.getElementById('checkAlternating');
+        const checkLinearColor = document.getElementById('checkLinearColor');
         const statWhite = document.getElementById('statWhite');
         const statPrimes = document.getElementById('statPrimes');
         const statApprox = document.getElementById('statApprox');
@@ -424,25 +428,32 @@
         function getCellColor(count) {
             if (count === 0) return COLOR_WHITE;
             
-            // Logarithmic scaling Green (120) -> Red (0)
-            // 1 divisor = 120 (green)
-            // maxDivisorsPossible divisors = 0 (red)
+            // Scaling Green (120) -> Red (0)
+            // 1 divisor = 120 (dark green)
+            // maxDivisorsPossible divisors = 0 (dark red)
             
-            if (maxDivisorsPossible <= 1) return `hsl(120, 100%, 50%)`;
+            if (maxDivisorsPossible <= 1) return `hsl(120, 100%, 30%)`;
             
             let ratio;
             if (count <= 1) {
                 ratio = 0;
             } else {
-                // log(1) = 0, log(max) = maxLog
-                const maxLog = Math.log(maxDivisorsPossible);
-                ratio = Math.log(count) / maxLog;
+                if (checkLinearColor.checked) {
+                    // Linear scale
+                    ratio = (count - 1) / (maxDivisorsPossible - 1);
+                } else {
+                    // Logarithmic scale
+                    const maxLog = Math.log(maxDivisorsPossible);
+                    ratio = Math.log(count) / maxLog;
+                }
             }
             
             if (ratio > 1) ratio = 1;
+            if (ratio < 0) ratio = 0;
             
             const hue = 120 * (1 - ratio);
-            const lightness = 50 - (ratio * 10); // Slightly darker towards red
+            // Use 30% lightness for a darker look across the scale
+            const lightness = 30; 
             return `hsl(${hue}, 100%, ${lightness}%)`;
         }
 
@@ -529,7 +540,13 @@
                 else type = "Composite (Scale)";
                 
                 let percent = 0;
-                if (c >= 1) percent = Math.round(((Math.log(c))/(Math.log(maxDivisorsPossible)))*100);
+                if (c >= 1) {
+                    if (checkLinearColor.checked) {
+                        percent = Math.round(((c-1)/(maxDivisorsPossible-1))*100);
+                    } else {
+                        percent = Math.round(((Math.log(c))/(Math.log(maxDivisorsPossible)))*100);
+                    }
+                }
 
                 hoverDetails.innerHTML = `
                     <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
@@ -575,10 +592,8 @@
             } else {
                 // If prime (or in normal mode), update Mertens product
                 if (touchCounts[currentStep] === 0 && currentStep >= 2) {
-                    // Feedback: only use primes from the first row (currentStep < GRID_COLS)
-                    if (currentStep < GRID_COLS) {
-                        mertensProduct *= (1 - 1/currentStep);
-                    }
+                    // Include all primes encountered so far
+                    mertensProduct *= (1 - 1/currentStep);
                 }
 
                 for (let i = 0; i <= MAX_NUMBER; i += currentStep) {
