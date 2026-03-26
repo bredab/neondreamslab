@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Adaptív Osztó Hőtérkép v4 (X/Y)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: #fff;
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 340px; /* Kicsit szélesebb a két csúszka miatt */
+            background: #16213e;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            z-index: 10;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #0d0d16;
+            overflow: hidden;
+            position: relative;
+        }
+
+        h1 { margin: 0; font-size: 20px; color: #fff; }
+        
+        .description {
+            color: #a0a0c0;
+            font-size: 13px;
+            line-height: 1.4;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .controls {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-group {
+            display: flex; flex-direction: column; gap: 5px; margin-bottom: 5px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .slider-btn {
+            padding: 5px;
+            font-size: 16px;
+            width: 30px; height: 30px;
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 50%; flex-shrink: 0;
+            background-color: #0f3460; color: white; border: none; cursor: pointer;
+        }
+        .slider-btn:hover { background-color: #e94560; }
+
+        input[type="range"] { width: 100%; cursor: pointer; }
+
+        button {
+            padding: 10px;
+            font-size: 15px;
+            cursor: pointer;
+            background-color: #0f3460;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background 0.2s;
+            width: 100%;
+            text-align: center;
+        }
+        button:hover { background-color: #e94560; }
+        button:disabled { background-color: #444; cursor: not-allowed; opacity: 0.7; }
+        
+        .btn-row { display: flex; gap: 10px; }
+
+        .legend {
+            display: flex; flex-direction: column; gap: 8px; font-size: 13px;
+            margin-top: 10px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 10px; }
+        .dot { width: 15px; height: 15px; border-radius: 3px; border: 1px solid #555; }
+
+        .gradient-bar {
+            width: 15px; height: 80px;
+            background: linear-gradient(to top, #000000, #b78805, #f1c40f);
+            border-radius: 3px; border: 1px solid #555;
+        }
+        .gradient-labels {
+            display: flex; flex-direction: column; justify-content: space-between; height: 80px;
+        }
+
+        #status {
+            font-size: 14px; font-weight: bold; color: #f1c40f;
+            padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px;
+            min-height: 40px; display: flex; align-items: center;
+        }
+        
+        #hover-info {
+            background: rgba(255,255,255,0.05); 
+            padding: 15px; 
+            border-radius: 10px; 
+            height: 140px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 5px;
+        }
+
+        #hover-number { font-size: 22px; font-weight: bold; color: #fff; }
+        #hover-factors { font-family: 'Consolas', monospace; color: #4aa3df; font-size: 16px; margin-bottom: 5px; }
+        #hover-details { color: #aaa; font-size: 13px; line-height: 1.4; }
+
+        #canvas-container {
+            width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+        }
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            background-color: #0d0d16;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h1>Adaptív Osztó Hőtérkép v4</h1>
+        
+        <div class="description">
+            <b>Újdonság:</b> Állítható szélesség és magasság.<br>
+            • Zöld: Prím (1)<br>
+            • Fekete &rarr; Sárga: Összetett<br>
+            • Piros keret: Aktuális osztó
+        </div>
+
+        <div id="hover-info">
+            <div id="hover-number">Húzd az egeret a rácsra</div>
+            <div id="hover-factors"></div>
+            <div id="hover-details">Részletes adatok itt jelennek meg.</div>
+        </div>
+
+        <div class="controls">
+            <!-- 1. Oszlopok (Szélesség) -->
+            <div class="control-group">
+                <label>Oszlopok (Szél.): <span id="colsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
+                <div class="slider-container">
+                    <button onclick="updateDimension('cols', -1)" class="slider-btn">-</button>
+                    <input type="range" id="colsSlider" min="5" max="210" step="1" value="10">
+                    <button onclick="updateDimension('cols', 1)" class="slider-btn">+</button>
+                </div>
+            </div>
+
+            <!-- 2. Sorok (Magasság) -->
+            <div class="control-group">
+                <label>Sorok (Mag.): <span id="rowsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
+                <div class="slider-container">
+                    <button onclick="updateDimension('rows', -1)" class="slider-btn">-</button>
+                    <input type="range" id="rowsSlider" min="5" max="210" step="1" value="10">
+                    <button onclick="updateDimension('rows', 1)" class="slider-btn">+</button>
+                </div>
+            </div>
+            
+            <div style="text-align:center; font-size:12px; color:#aaa; margin-bottom:10px;">
+                Összes cella: <span id="totalCellsLabel">100</span>
+            </div>
+
+            <!-- Gombok -->
+            <button id="btnNext" onclick="manualStep()">+1 Lépés (Következő)</button>
+            
+            <div class="btn-row">
+                <button id="btnAuto" onclick="toggleAutoPlay()">Auto Lejátszás</button>
+                <button id="btnReset" onclick="resetGrid()" style="background-color:#444;">Vissza</button>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:#fff"></div> 0 találat (Érintetlen/1)</div>
+            <div class="legend-item"><div class="dot" style="background:#2ecc71"></div> 1 találat (Prím)</div>
+            <div class="legend-item"><div class="dot" style="border: 2px solid #e74c3c; background: transparent;"></div> Aktuális Osztó</div>
+            <div class="legend-item">
+                <div class="gradient-bar"></div>
+                <div class="gradient-labels">
+                    <span id="legendMax">Max</span>
+                    <span>2 (Kezdő)</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="status">Indulásra kész.</div>
+    </div>
+
+    <div class="main-content">
+        <div id="canvas-container">
+            <canvas id="gridCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Külön változók a soroknak és oszlopoknak
+        let GRID_COLS = 10;
+        let GRID_ROWS = 10;
+        let MAX_NUMBER = 99; // (COLS * ROWS) - 1
+        
+        const canvas = document.getElementById('gridCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const container = document.getElementById('canvas-container');
+        const statusDiv = document.getElementById('status');
+        
+        // UI elemek
+        const colsSlider = document.getElementById('colsSlider');
+        const rowsSlider = document.getElementById('rowsSlider');
+        const colsLabel = document.getElementById('colsLabel');
+        const rowsLabel = document.getElementById('rowsLabel');
+        const totalCellsLabel = document.getElementById('totalCellsLabel');
+        
+        const legendMaxLabel = document.getElementById('legendMax');
+        const hoverNumber = document.getElementById('hover-number');
+        const hoverFactors = document.getElementById('hover-factors');
+        const hoverDetails = document.getElementById('hover-details');
+        
+        const btnNext = document.getElementById('btnNext');
+        const btnAuto = document.getElementById('btnAuto');
+
+        // Adatszerkezetek
+        let touchCounts = []; 
+        let currentStep = 2; 
+        let isAutoPlaying = false;
+        let animationFrameId = null;
+        let cellSize = 0;
+        let maxDivisorsPossible = 10;
+
+        // Színek
+        const COLOR_BG = '#0d0d16';
+        const COLOR_WHITE = '#ffffff';
+        const COLOR_GREEN = '#2ecc71';
+        const COLOR_HIGHLIGHT_BORDER = '#e74c3c'; 
+
+        function initGrid() {
+            MAX_NUMBER = (GRID_COLS * GRID_ROWS) - 1; 
+            touchCounts = new Int32Array(MAX_NUMBER + 1).fill(0);
+            
+            // UI frissítése
+            colsLabel.textContent = GRID_COLS;
+            rowsLabel.textContent = GRID_ROWS;
+            totalCellsLabel.textContent = MAX_NUMBER + 1;
+
+            calculateMaxPossibleDivisors();
+            resizeCanvas(); 
+            
+            updateNextButtonLabel();
+            drawGrid();
+            updateStatus("Várakozás... Lépésköz: 2");
+        }
+
+        // --- MÉRETEZÉS KEZELÉSE ---
+        
+        function updateDimension(type, delta) {
+            if (type === 'cols') {
+                let newVal = parseInt(colsSlider.value) + delta;
+                newVal = Math.max(5, Math.min(newVal, 210));
+                colsSlider.value = newVal;
+                GRID_COLS = newVal;
+            } else {
+                let newVal = parseInt(rowsSlider.value) + delta;
+                newVal = Math.max(5, Math.min(newVal, 210));
+                rowsSlider.value = newVal;
+                GRID_ROWS = newVal;
+            }
+            resetGrid();
+        }
+
+        colsSlider.oninput = function() { 
+            GRID_COLS = parseInt(this.value); 
+            resetGrid(); 
+        };
+        
+        rowsSlider.oninput = function() { 
+            GRID_ROWS = parseInt(this.value); 
+            resetGrid(); 
+        };
+
+        function resizeCanvas() {
+            const maxWidth = container.clientWidth - 20;
+            const maxHeight = container.clientHeight - 20;
+            
+            // Kiszámoljuk, mekkora lehet a cella, hogy vízszintesen IS és függőlegesen IS beférjen
+            // Így a cellák négyzetesek maradnak
+            const cellW = maxWidth / GRID_COLS;
+            const cellH = maxHeight / GRID_ROWS;
+            
+            cellSize = Math.min(cellW, cellH);
+            
+            // A vászon mérete pontosan a rácshoz igazodik
+            canvas.width = cellSize * GRID_COLS;
+            canvas.height = cellSize * GRID_ROWS;
+        }
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            drawGrid();
+        });
+
+        // --- EGYÉB LOGIKA ---
+
+        function updateNextButtonLabel() {
+            if (currentStep > MAX_NUMBER) {
+                btnNext.textContent = "Kész";
+            } else {
+                btnNext.textContent = `+1 Lépés (Következő: ${currentStep})`;
+            }
+        }
+
+        function calculateMaxPossibleDivisors() {
+            let tempCounts = new Int32Array(MAX_NUMBER + 1).fill(0);
+            let localMax = 0;
+            for (let step = 2; step <= MAX_NUMBER; step++) {
+                for (let i = 0; i <= MAX_NUMBER; i += step) {
+                    tempCounts[i]++;
+                }
+            }
+            for (let i = 1; i <= MAX_NUMBER; i++) {
+                if (tempCounts[i] > localMax) localMax = tempCounts[i];
+            }
+            maxDivisorsPossible = localMax;
+            legendMaxLabel.textContent = maxDivisorsPossible;
+        }
+
+        function getPrimeFactors(n) {
+            if (n < 2) return "";
+            const factors = {};
+            let d = 2;
+            let temp = n;
+            while (d * d <= temp) {
+                while (temp % d === 0) {
+                    factors[d] = (factors[d] || 0) + 1;
+                    temp /= d;
+                }
+                d++;
+            }
+            if (temp > 1) factors[temp] = (factors[temp] || 0) + 1;
+            return Object.entries(factors).map(([base, exp]) => {
+                return exp > 1 ? `${base}<sup>${exp}</sup>` : base;
+            }).join(' × ');
+        }
+
+        function getCellColor(count) {
+            if (count === 0) return COLOR_WHITE;
+            if (count === 1) return COLOR_GREEN;
+
+            let range = maxDivisorsPossible - 2;
+            if (range < 1) range = 1;
+            let ratio = (count - 2) / range;
+            if (ratio > 1) ratio = 1;
+
+            let lightness = 5 + (ratio * 55); 
+            return `hsl(48, 100%, ${lightness}%)`;
+        }
+
+        function drawCell(i) {
+            if (i > MAX_NUMBER) return;
+            
+            // FONTOS VÁLTOZÁS: Koordináták számítása Oszlopok alapján
+            const row = Math.floor(i / GRID_COLS);
+            const col = i % GRID_COLS;
+            
+            const x = col * cellSize;
+            const y = row * cellSize;
+            const gap = (GRID_COLS > 100 || GRID_ROWS > 100) ? 0 : 1; 
+
+            const count = touchCounts[i];
+            
+            ctx.fillStyle = getCellColor(count);
+            ctx.fillRect(x, y, cellSize - gap, cellSize - gap);
+
+            if (i === currentStep && i <= MAX_NUMBER) {
+                ctx.lineWidth = Math.max(2, cellSize * 0.1);
+                ctx.strokeStyle = COLOR_HIGHLIGHT_BORDER;
+                ctx.strokeRect(x, y, cellSize - gap, cellSize - gap);
+            }
+
+            // Szöveg csak ha elég nagy a cella (>20px)
+            if (cellSize > 20) {
+                let textColor = '#fff';
+                if (count === 0) textColor = '#000';
+                if (count > 1 && (count - 2) / (maxDivisorsPossible - 2) > 0.7) textColor = '#000';
+
+                let fontSize = Math.floor(cellSize * 0.4);
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.fillStyle = textColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(i, x + cellSize/2, y + cellSize/2);
+            }
+        }
+
+        function drawGrid() {
+            ctx.fillStyle = COLOR_BG;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i <= MAX_NUMBER; i++) {
+                drawCell(i);
+            }
+        }
+
+        // --- EGÉR HOVER ---
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const col = Math.floor(((e.clientX - rect.left) * scaleX) / cellSize);
+            const row = Math.floor(((e.clientY - rect.top) * scaleY) / cellSize);
+            
+            // Index számítása: row * GRID_COLS + col
+            const number = (row * GRID_COLS) + col;
+            
+            // Ellenőrzés, hogy a kattintás érvényes cellán belül van-e
+            // (Mivel a vászon négyzetes cellákra van méretezve, elvileg mindig érvényes, 
+            // de a col < GRID_COLS és row < GRID_ROWS fontos)
+            if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS && number <= MAX_NUMBER) {
+                hoverNumber.textContent = `${number}`;
+                
+                const factors = getPrimeFactors(number);
+                hoverFactors.innerHTML = factors ? factors : (number === 1 ? "Egység" : "Nulla");
+
+                const c = touchCounts[number];
+                let type = "";
+                let colorHex = getCellColor(c);
+
+                if (c === 0) type = "Érintetlen (1)";
+                else if (c === 1) type = "Prímszám (Zöld)";
+                else type = "Összetett (Skála)";
+                
+                let percent = 0;
+                if (c >= 2) percent = Math.round(((c-2)/(maxDivisorsPossible-2))*100);
+
+                hoverDetails.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+                        <div style="width:20px; height:20px; background:${colorHex}; border:1px solid #555;"></div>
+                        <span>${type}</span>
+                    </div>
+                    Osztók száma (kivéve 1): <b>${c}</b><br>
+                    ${c >= 2 ? `Intenzitás: ${percent}%` : ''}
+                `;
+            }
+        });
+
+        // --- VEZÉRLÉS ---
+
+        function updateStatus(text) {
+            statusDiv.textContent = text;
+        }
+
+        function resetGrid() {
+            stopAutoPlay();
+            currentStep = 2;
+            btnNext.disabled = false;
+            btnAuto.disabled = false;
+            initGrid();
+        }
+
+        function performStep() {
+            if (currentStep > MAX_NUMBER) {
+                updateStatus("Kész! A vizsgálat lezárult.");
+                stopAutoPlay();
+                btnNext.disabled = true;
+                btnAuto.disabled = true;
+                updateNextButtonLabel();
+                drawGrid(); 
+                return false;
+            }
+
+            for (let i = 0; i <= MAX_NUMBER; i += currentStep) {
+                touchCounts[i]++;
+            }
+
+            updateStatus(`Lépésköz: ${currentStep} kész. (${Math.floor((currentStep/MAX_NUMBER)*100)}%)`);
+            currentStep++;
+            updateNextButtonLabel(); 
+            drawGrid(); 
+            return true;
+        }
+
+        function manualStep() {
+            stopAutoPlay(); 
+            performStep();
+        }
+
+        function toggleAutoPlay() {
+            if (isAutoPlaying) {
+                stopAutoPlay();
+            } else {
+                isAutoPlaying = true;
+                btnAuto.textContent = "Szünet";
+                btnAuto.style.backgroundColor = "#e74c3c";
+                btnNext.disabled = true; 
+                autoPlayLoop();
+            }
+        }
+
+        function stopAutoPlay() {
+            isAutoPlaying = false;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            btnAuto.textContent = "Auto Lejátszás";
+            btnAuto.style.backgroundColor = "#0f3460";
+            btnNext.disabled = false;
+        }
+
+        function autoPlayLoop() {
+            if (!isAutoPlaying) return;
+
+            let totalCells = GRID_COLS * GRID_ROWS;
+            let stepsPerFrame = 1;
+            if (totalCells > 900) stepsPerFrame = 2;
+            if (totalCells > 3600) stepsPerFrame = 10;
+            if (totalCells > 10000) stepsPerFrame = 50;
+            if (totalCells > 22500) stepsPerFrame = 100;
+
+            for (let k = 0; k < stepsPerFrame; k++) {
+                const continuing = performStep();
+                if (!continuing) return;
+            }
+
+            animationFrameId = requestAnimationFrame(autoPlayLoop);
+        }
+
+        // Indulás
+        initGrid();
+
+    </script>
+</body>
+</html>
