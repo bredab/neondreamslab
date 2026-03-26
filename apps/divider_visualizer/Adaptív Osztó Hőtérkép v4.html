@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Adaptív Osztó Hőtérkép v4 (X/Y)</title>
+    <title>Adaptive Divisor Heatmap v1.0</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -40,14 +40,14 @@
             position: relative;
         }
 
-        h1 { margin: 0; font-size: 20px; color: #fff; }
+        h1 { margin: 0; font-size: 18px; color: #fff; line-height: 1.2; }
         
         .description {
             color: #a0a0c0;
-            font-size: 13px;
-            line-height: 1.4;
+            font-size: 12px;
+            line-height: 1.3;
             background: rgba(0,0,0,0.2);
-            padding: 10px;
+            padding: 8px;
             border-radius: 5px;
         }
 
@@ -109,7 +109,7 @@
 
         .gradient-bar {
             width: 15px; height: 80px;
-            background: linear-gradient(to top, #000000, #b78805, #f1c40f);
+            background: linear-gradient(to top, #ff0000, #00ff00);
             border-radius: 3px; border: 1px solid #555;
         }
         .gradient-labels {
@@ -151,25 +151,32 @@
 <body>
 
     <div class="sidebar">
-        <h1>Adaptív Osztó Hőtérkép v4</h1>
+        <h1>Adaptive Divisor Heatmap<br><small style="font-size: 0.8em; color: #aaa;">v1.0</small></h1>
         
         <div class="description">
-            <b>Újdonság:</b> Állítható szélesség és magasság.<br>
-            • Zöld: Prím (1)<br>
-            • Fekete &rarr; Sárga: Összetett<br>
-            • Piros keret: Aktuális osztó
+            <b>Modes:</b> Sieve and Alternating Layout.<br>
+            • Green: Few divisors (1)<br>
+            • Red: Many divisors (Max)<br>
+            • Red border: Current number being examined
+        </div>
+
+        <div id="stats-panel" class="description" style="background: rgba(46, 204, 113, 0.1); border: 1px solid rgba(46, 204, 113, 0.2); font-family: monospace;">
+            White cells: <span id="statWhite">0</span><br>
+            Prime count π(x): <span id="statPrimes">0</span><br>
+            x/ln(x) approx: <span id="statApprox">0</span><br>
+            Mertens (Rows*Π): <span id="statMertens">0</span>
         </div>
 
         <div id="hover-info">
-            <div id="hover-number">Húzd az egeret a rácsra</div>
+            <div id="hover-number">Hover over the grid</div>
             <div id="hover-factors"></div>
-            <div id="hover-details">Részletes adatok itt jelennek meg.</div>
+            <div id="hover-details">Detailed info will appear here.</div>
         </div>
 
         <div class="controls">
-            <!-- 1. Oszlopok (Szélesség) -->
+            <!-- 1. Columns (Width) -->
             <div class="control-group">
-                <label>Oszlopok (Szél.): <span id="colsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
+                <label>Columns (Width): <span id="colsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
                 <div class="slider-container">
                     <button onclick="updateDimension('cols', -1)" class="slider-btn">-</button>
                     <input type="range" id="colsSlider" min="5" max="210" step="1" value="10">
@@ -177,9 +184,9 @@
                 </div>
             </div>
 
-            <!-- 2. Sorok (Magasság) -->
+            <!-- 2. Rows (Height) -->
             <div class="control-group">
-                <label>Sorok (Mag.): <span id="rowsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
+                <label>Rows (Height): <span id="rowsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
                 <div class="slider-container">
                     <button onclick="updateDimension('rows', -1)" class="slider-btn">-</button>
                     <input type="range" id="rowsSlider" min="5" max="210" step="1" value="10">
@@ -188,32 +195,40 @@
             </div>
             
             <div style="text-align:center; font-size:12px; color:#aaa; margin-bottom:10px;">
-                Összes cella: <span id="totalCellsLabel">100</span>
+                Total cells: <span id="totalCellsLabel">100</span>
             </div>
 
-            <!-- Gombok -->
-            <button id="btnNext" onclick="manualStep()">+1 Lépés (Következő)</button>
+            <div class="control-group" style="font-size: 13px; gap: 8px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="checkSieve" onchange="resetGrid()"> Classic Sieve Mode
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="checkAlternating" onchange="drawGrid()"> Alternating Layout (Boustrophedon)
+                </label>
+            </div>
+
+            <!-- Buttons -->
+            <button id="btnNext" onclick="manualStep()">+1 Step (Next)</button>
             
             <div class="btn-row">
-                <button id="btnAuto" onclick="toggleAutoPlay()">Auto Lejátszás</button>
-                <button id="btnReset" onclick="resetGrid()" style="background-color:#444;">Vissza</button>
+                <button id="btnAuto" onclick="toggleAutoPlay()">Auto Play</button>
+                <button id="btnReset" onclick="resetGrid()" style="background-color:#444;">Reset</button>
             </div>
         </div>
 
         <div class="legend">
-            <div class="legend-item"><div class="dot" style="background:#fff"></div> 0 találat (Érintetlen/1)</div>
-            <div class="legend-item"><div class="dot" style="background:#2ecc71"></div> 1 találat (Prím)</div>
-            <div class="legend-item"><div class="dot" style="border: 2px solid #e74c3c; background: transparent;"></div> Aktuális Osztó</div>
+            <div class="legend-item"><div class="dot" style="background:#fff"></div> 0 hits (Untouched / 1)</div>
+            <div class="legend-item"><div class="dot" style="border: 2px solid #e74c3c; background: transparent;"></div> Current number examined</div>
             <div class="legend-item">
                 <div class="gradient-bar"></div>
                 <div class="gradient-labels">
-                    <span id="legendMax">Max</span>
-                    <span>2 (Kezdő)</span>
+                    <span id="legendMax">Many divisors (Red)</span>
+                    <span>1 divisor (Green)</span>
                 </div>
             </div>
         </div>
 
-        <div id="status">Indulásra kész.</div>
+        <div id="status">Ready to start.</div>
     </div>
 
     <div class="main-content">
@@ -223,7 +238,7 @@
     </div>
 
     <script>
-        // Külön változók a soroknak és oszlopoknak
+        // Grid dimensions
         let GRID_COLS = 10;
         let GRID_ROWS = 10;
         let MAX_NUMBER = 99; // (COLS * ROWS) - 1
@@ -247,39 +262,72 @@
         
         const btnNext = document.getElementById('btnNext');
         const btnAuto = document.getElementById('btnAuto');
+        
+        const checkSieve = document.getElementById('checkSieve');
+        const checkAlternating = document.getElementById('checkAlternating');
+        const statWhite = document.getElementById('statWhite');
+        const statPrimes = document.getElementById('statPrimes');
+        const statApprox = document.getElementById('statApprox');
+        const statMertens = document.getElementById('statMertens');
 
-        // Adatszerkezetek
+        // Data structures
         let touchCounts = []; 
         let currentStep = 2; 
         let isAutoPlaying = false;
         let animationFrameId = null;
         let cellSize = 0;
         let maxDivisorsPossible = 10;
+        
+        // Statistics
+        let totalPrimesInRange = 0;
+        let mertensProduct = 1.0;
 
-        // Színek
+        // Colors
         const COLOR_BG = '#0d0d16';
         const COLOR_WHITE = '#ffffff';
-        const COLOR_GREEN = '#2ecc71';
         const COLOR_HIGHLIGHT_BORDER = '#e74c3c'; 
+
+        function isPrime(n) {
+            if (n < 2) return false;
+            for (let i = 2; i * i <= n; i++) {
+                if (n % i === 0) return false;
+            }
+            return true;
+        }
 
         function initGrid() {
             MAX_NUMBER = (GRID_COLS * GRID_ROWS) - 1; 
             touchCounts = new Int32Array(MAX_NUMBER + 1).fill(0);
             
-            // UI frissítése
+            // Update UI
             colsLabel.textContent = GRID_COLS;
             rowsLabel.textContent = GRID_ROWS;
             totalCellsLabel.textContent = MAX_NUMBER + 1;
+
+            // Reset statistics
+            totalPrimesInRange = 0;
+            for(let i=0; i<=MAX_NUMBER; i++) if(isPrime(i)) totalPrimesInRange++;
+            statPrimes.textContent = totalPrimesInRange;
+            statApprox.textContent = Math.round(MAX_NUMBER / Math.log(MAX_NUMBER));
+            mertensProduct = 1.0;
+            updateStatsUI();
 
             calculateMaxPossibleDivisors();
             resizeCanvas(); 
             
             updateNextButtonLabel();
             drawGrid();
-            updateStatus("Várakozás... Lépésköz: 2");
+            updateStatus("Waiting... Step size: 2");
         }
 
-        // --- MÉRETEZÉS KEZELÉSE ---
+        function updateStatsUI() {
+            let whiteCount = 0;
+            for(let i=0; i<=MAX_NUMBER; i++) if(touchCounts[i] === 0) whiteCount++;
+            statWhite.textContent = whiteCount;
+            statMertens.textContent = (mertensProduct * GRID_ROWS).toFixed(4);
+        }
+
+        // --- DIMENSION HANDLING ---
         
         function updateDimension(type, delta) {
             if (type === 'cols') {
@@ -310,14 +358,14 @@
             const maxWidth = container.clientWidth - 20;
             const maxHeight = container.clientHeight - 20;
             
-            // Kiszámoljuk, mekkora lehet a cella, hogy vízszintesen IS és függőlegesen IS beférjen
-            // Így a cellák négyzetesek maradnak
+            // Calculate cell size to fit both horizontally and vertically
+            // Keep cells square
             const cellW = maxWidth / GRID_COLS;
             const cellH = maxHeight / GRID_ROWS;
             
             cellSize = Math.min(cellW, cellH);
             
-            // A vászon mérete pontosan a rácshoz igazodik
+            // Canvas size fits the grid exactly
             canvas.width = cellSize * GRID_COLS;
             canvas.height = cellSize * GRID_ROWS;
         }
@@ -327,13 +375,13 @@
             drawGrid();
         });
 
-        // --- EGYÉB LOGIKA ---
+        // --- OTHER LOGIC ---
 
         function updateNextButtonLabel() {
             if (currentStep > MAX_NUMBER) {
-                btnNext.textContent = "Kész";
+                btnNext.textContent = "Done";
             } else {
-                btnNext.textContent = `+1 Lépés (Következő: ${currentStep})`;
+                btnNext.textContent = `+1 Step (Next: ${currentStep})`;
             }
         }
 
@@ -353,6 +401,8 @@
         }
 
         function getPrimeFactors(n) {
+            if (n === 0) return "Zero";
+            if (n === 1) return "Unit";
             if (n < 2) return "";
             const factors = {};
             let d = 2;
@@ -372,23 +422,39 @@
 
         function getCellColor(count) {
             if (count === 0) return COLOR_WHITE;
-            if (count === 1) return COLOR_GREEN;
-
-            let range = maxDivisorsPossible - 2;
-            if (range < 1) range = 1;
-            let ratio = (count - 2) / range;
+            
+            // Logarithmic scaling Green (120) -> Red (0)
+            // 1 divisor = 120 (green)
+            // maxDivisorsPossible divisors = 0 (red)
+            
+            if (maxDivisorsPossible <= 1) return `hsl(120, 100%, 50%)`;
+            
+            let ratio;
+            if (count <= 1) {
+                ratio = 0;
+            } else {
+                // log(1) = 0, log(max) = maxLog
+                const maxLog = Math.log(maxDivisorsPossible);
+                ratio = Math.log(count) / maxLog;
+            }
+            
             if (ratio > 1) ratio = 1;
-
-            let lightness = 5 + (ratio * 55); 
-            return `hsl(48, 100%, ${lightness}%)`;
+            
+            const hue = 120 * (1 - ratio);
+            const lightness = 50 - (ratio * 10); // Slightly darker towards red
+            return `hsl(${hue}, 100%, ${lightness}%)`;
         }
 
         function drawCell(i) {
             if (i > MAX_NUMBER) return;
             
-            // FONTOS VÁLTOZÁS: Koordináták számítása Oszlopok alapján
             const row = Math.floor(i / GRID_COLS);
-            const col = i % GRID_COLS;
+            let col = i % GRID_COLS;
+            
+            // Handle Boustrophedon layout
+            if (checkAlternating.checked && row % 2 === 1) {
+                col = (GRID_COLS - 1) - col;
+            }
             
             const x = col * cellSize;
             const y = row * cellSize;
@@ -405,11 +471,13 @@
                 ctx.strokeRect(x, y, cellSize - gap, cellSize - gap);
             }
 
-            // Szöveg csak ha elég nagy a cella (>20px)
+            // Text only if cell is large enough (>20px)
             if (cellSize > 20) {
                 let textColor = '#fff';
                 if (count === 0) textColor = '#000';
-                if (count > 1 && (count - 2) / (maxDivisorsPossible - 2) > 0.7) textColor = '#000';
+                // Improve readability: dark text for light colors
+                const ratio = count <= 1 ? 0 : Math.log(count)/Math.log(maxDivisorsPossible);
+                if (ratio < 0.3 || count === 0) textColor = '#000';
 
                 let fontSize = Math.floor(cellSize * 0.4);
                 ctx.font = `bold ${fontSize}px Arial`;
@@ -428,49 +496,52 @@
             }
         }
 
-        // --- EGÉR HOVER ---
+        // --- MOUSE HOVER ---
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-            const col = Math.floor(((e.clientX - rect.left) * scaleX) / cellSize);
+            let col = Math.floor(((e.clientX - rect.left) * scaleX) / cellSize);
             const row = Math.floor(((e.clientY - rect.top) * scaleY) / cellSize);
             
-            // Index számítása: row * GRID_COLS + col
-            const number = (row * GRID_COLS) + col;
+            // Revert Boustrophedon index
+            let displayCol = col;
+            if (checkAlternating.checked && row % 2 === 1) {
+                displayCol = (GRID_COLS - 1) - col;
+            }
+
+            const number = (row * GRID_COLS) + displayCol;
             
-            // Ellenőrzés, hogy a kattintás érvényes cellán belül van-e
-            // (Mivel a vászon négyzetes cellákra van méretezve, elvileg mindig érvényes, 
-            // de a col < GRID_COLS és row < GRID_ROWS fontos)
+            // Check if coordinates are within valid grid
             if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS && number <= MAX_NUMBER) {
                 hoverNumber.textContent = `${number}`;
                 
                 const factors = getPrimeFactors(number);
-                hoverFactors.innerHTML = factors ? factors : (number === 1 ? "Egység" : "Nulla");
+                hoverFactors.innerHTML = factors;
 
                 const c = touchCounts[number];
                 let type = "";
                 let colorHex = getCellColor(c);
 
-                if (c === 0) type = "Érintetlen (1)";
-                else if (c === 1) type = "Prímszám (Zöld)";
-                else type = "Összetett (Skála)";
+                if (c === 0) type = "Untouched (1)";
+                else if (c === 1) type = "Prime Number (Green)";
+                else type = "Composite (Scale)";
                 
                 let percent = 0;
-                if (c >= 2) percent = Math.round(((c-2)/(maxDivisorsPossible-2))*100);
+                if (c >= 1) percent = Math.round(((Math.log(c))/(Math.log(maxDivisorsPossible)))*100);
 
                 hoverDetails.innerHTML = `
                     <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
                         <div style="width:20px; height:20px; background:${colorHex}; border:1px solid #555;"></div>
                         <span>${type}</span>
                     </div>
-                    Osztók száma (kivéve 1): <b>${c}</b><br>
-                    ${c >= 2 ? `Intenzitás: ${percent}%` : ''}
+                    Number of divisors (excl. 1): <b>${c}</b><br>
+                    ${c >= 1 ? `Intensity: ${percent}%` : ''}
                 `;
             }
         });
 
-        // --- VEZÉRLÉS ---
+        // --- CONTROLS ---
 
         function updateStatus(text) {
             statusDiv.textContent = text;
@@ -486,23 +557,41 @@
 
         function performStep() {
             if (currentStep > MAX_NUMBER) {
-                updateStatus("Kész! A vizsgálat lezárult.");
+                updateStatus("Done! Investigation finished.");
                 stopAutoPlay();
                 btnNext.disabled = true;
                 btnAuto.disabled = true;
                 updateNextButtonLabel();
                 drawGrid(); 
+                updateStatsUI();
                 return false;
             }
 
-            for (let i = 0; i <= MAX_NUMBER; i += currentStep) {
-                touchCounts[i]++;
+            // Sieve of Eratosthenes mode: only process primes
+            let skipped = false;
+            if (checkSieve.checked && touchCounts[currentStep] > 0) {
+                skipped = true;
+            } else {
+                // If prime (or in normal mode), update Mertens product
+                if (touchCounts[currentStep] === 0 && currentStep >= 2) {
+                    mertensProduct *= (1 - 1/currentStep);
+                }
+
+                for (let i = 0; i <= MAX_NUMBER; i += currentStep) {
+                    touchCounts[i]++;
+                }
             }
 
-            updateStatus(`Lépésköz: ${currentStep} kész. (${Math.floor((currentStep/MAX_NUMBER)*100)}%)`);
+            if (!skipped) {
+                updateStatus(`Step: ${currentStep} done. (${Math.floor((currentStep/MAX_NUMBER)*100)}%)`);
+            } else {
+                updateStatus(`Step: ${currentStep} skipped (composite).`);
+            }
+            
             currentStep++;
             updateNextButtonLabel(); 
             drawGrid(); 
+            updateStatsUI();
             return true;
         }
 
@@ -516,7 +605,7 @@
                 stopAutoPlay();
             } else {
                 isAutoPlaying = true;
-                btnAuto.textContent = "Szünet";
+                btnAuto.textContent = "Pause";
                 btnAuto.style.backgroundColor = "#e74c3c";
                 btnNext.disabled = true; 
                 autoPlayLoop();
@@ -526,7 +615,7 @@
         function stopAutoPlay() {
             isAutoPlaying = false;
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            btnAuto.textContent = "Auto Lejátszás";
+            btnAuto.textContent = "Auto Play";
             btnAuto.style.backgroundColor = "#0f3460";
             btnNext.disabled = false;
         }
@@ -549,7 +638,7 @@
             animationFrameId = requestAnimationFrame(autoPlayLoop);
         }
 
-        // Indulás
+        // Initialize
         initGrid();
 
     </script>
