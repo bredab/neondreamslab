@@ -17,7 +17,7 @@
         }
 
         .sidebar {
-            width: 340px; /* Kicsit szélesebb a két csúszka miatt */
+            width: 340px; /* Wider for two sliders */
             background: #16213e;
             padding: 20px;
             display: flex;
@@ -251,7 +251,7 @@
         const container = document.getElementById('canvas-container');
         const statusDiv = document.getElementById('status');
         
-        // UI elemek
+        // UI elements
         const colsSlider = document.getElementById('colsSlider');
         const rowsSlider = document.getElementById('rowsSlider');
         const colsLabel = document.getElementById('colsLabel');
@@ -284,6 +284,7 @@
         
         // Statistics
         let totalPrimesInRange = 0;
+        let primesInFirstRow = 0;
         let mertensProduct = 1.0;
 
         // Colors
@@ -310,7 +311,13 @@
 
             // Reset statistics
             totalPrimesInRange = 0;
-            for(let i=0; i<=MAX_NUMBER; i++) if(isPrime(i)) totalPrimesInRange++;
+            primesInFirstRow = 0;
+            for(let i=0; i<=MAX_NUMBER; i++) {
+                if(isPrime(i)) {
+                    totalPrimesInRange++;
+                    if (i > 0 && i <= GRID_COLS) primesInFirstRow++;
+                }
+            }
             statPrimes.textContent = totalPrimesInRange;
             statApprox.textContent = Math.round(MAX_NUMBER / Math.log(MAX_NUMBER));
             mertensProduct = 1.0;
@@ -328,8 +335,9 @@
             let whiteCount = 0;
             for(let i=0; i<=MAX_NUMBER; i++) if(touchCounts[i] === 0) whiteCount++;
             statWhite.textContent = whiteCount;
-            // Mertens product multiplied by total cells (COLS * ROWS)
-            statMertens.textContent = (mertensProduct * GRID_COLS * GRID_ROWS).toFixed(4);
+            // Mertens product + primes in first row
+            const val = (mertensProduct * GRID_COLS * GRID_ROWS) + primesInFirstRow;
+            statMertens.textContent = val.toFixed(4);
         }
 
         // --- DIMENSION HANDLING ---
@@ -426,25 +434,26 @@
         }
 
         function getCellColor(count) {
-            if (count === 0) return COLOR_WHITE;
+            // Darker green start (120) for fewest divisors, Darker red end (0) for most
             
-            // Scaling Green (120) -> Red (0)
-            // 1 divisor = 120 (dark green)
-            // maxDivisorsPossible divisors = 0 (dark red)
-            
-            if (maxDivisorsPossible <= 1) return `hsl(120, 100%, 30%)`;
+            // Default lightness 20%
+            const lightness = 20; 
+
+            if (maxDivisorsPossible <= 1) return `hsl(120, 100%, ${lightness}%)`;
             
             let ratio;
             if (count <= 1) {
                 ratio = 0;
             } else {
                 if (checkLinearColor.checked) {
-                    // Linear scale
+                    // Linear scale: count-1 / max-1
                     ratio = (count - 1) / (maxDivisorsPossible - 1);
                 } else {
-                    // Logarithmic scale
+                    // Logarithmic scale: log(count) / log(max)
+                    // Note: count is always >= 2 here because count <= 1 is handled above
                     const maxLog = Math.log(maxDivisorsPossible);
-                    ratio = Math.log(count) / maxLog;
+                    const countLog = Math.log(count);
+                    ratio = countLog / maxLog;
                 }
             }
             
@@ -452,8 +461,7 @@
             if (ratio < 0) ratio = 0;
             
             const hue = 120 * (1 - ratio);
-            // Use 30% lightness for a darker look across the scale
-            const lightness = 30; 
+            
             return `hsl(${hue}, 100%, ${lightness}%)`;
         }
 
