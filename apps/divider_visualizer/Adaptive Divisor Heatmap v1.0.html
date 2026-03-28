@@ -244,7 +244,7 @@
         // Grid dimensions
         let GRID_COLS = 10;
         let GRID_ROWS = 10;
-        let MAX_NUMBER = 100; // COLS * ROWS
+        let MAX_NUMBER = 99; // (COLS * ROWS) - 1
         
         const canvas = document.getElementById('gridCanvas');
         const ctx = canvas.getContext('2d', { alpha: false });
@@ -301,13 +301,13 @@
         }
 
         function initGrid() {
-            MAX_NUMBER = GRID_COLS * GRID_ROWS; 
+            MAX_NUMBER = (GRID_COLS * GRID_ROWS) - 1; 
             touchCounts = new Int32Array(MAX_NUMBER + 1).fill(0);
             
             // Update UI
             colsLabel.textContent = GRID_COLS;
             rowsLabel.textContent = GRID_ROWS;
-            totalCellsLabel.textContent = MAX_NUMBER;
+            totalCellsLabel.textContent = MAX_NUMBER + 1;
 
             // Reset statistics
             totalPrimesInRange = 0;
@@ -511,7 +511,7 @@
         function drawGrid() {
             ctx.fillStyle = COLOR_BG;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            for (let i = 1; i <= MAX_NUMBER; i++) {
+            for (let i = 0; i <= MAX_NUMBER; i++) {
                 drawCell(i);
             }
         }
@@ -530,10 +530,10 @@
                 displayCol = (GRID_COLS - 1) - col;
             }
 
-            const number = (row * GRID_COLS) + displayCol + 1;
+            const number = (row * GRID_COLS) + displayCol;
             
             // Check if coordinates are within valid grid
-            if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS && number >= 1 && number <= MAX_NUMBER) {
+            if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS && number <= MAX_NUMBER) {
                 hoverNumber.textContent = `${number}`;
                 
                 const factors = getPrimeFactors(number);
@@ -604,7 +604,7 @@
                     mertensProduct *= (1 - 1/currentStep);
                 }
 
-                for (let i = currentStep; i <= MAX_NUMBER; i += currentStep) {
+                for (let i = 0; i <= MAX_NUMBER; i += currentStep) {
                     touchCounts[i]++;
                 }
             }
