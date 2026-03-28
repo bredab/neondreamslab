@@ -592,8 +592,10 @@
             } else {
                 // If prime (or in normal mode), update Mertens product
                 if (touchCounts[currentStep] === 0 && currentStep >= 2) {
-                    // Include all primes encountered so far
-                    mertensProduct *= (1 - 1/currentStep);
+                    // Feedback: only use primes from the first row (currentStep < GRID_COLS)
+                    if (currentStep < GRID_COLS) {
+                        mertensProduct *= (1 - 1/currentStep);
+                    }
                 }
 
                 for (let i = 0; i <= MAX_NUMBER; i += currentStep) {
