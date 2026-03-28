@@ -109,7 +109,7 @@
 
         .gradient-bar {
             width: 15px; height: 80px;
-            background: linear-gradient(to bottom, #ff0000, #00ff00);
+            background: linear-gradient(to bottom, #8b0000, #ffff00, #006400);
             border-radius: 3px; border: 1px solid #555;
         }
         .gradient-labels {
@@ -230,8 +230,8 @@
             <div class="legend-item">
                 <div class="gradient-bar"></div>
                 <div class="gradient-labels">
-                    <span id="legendMax">Many divisors (Red)</span>
-                    <span>1 divisor (Green)</span>
+                    <span id="legendMax">Many divisors (Dark Red)</span>
+                    <span>1 divisor (Dark Green)</span>
                 </div>
             </div>
         </div>
@@ -446,11 +446,11 @@
         function getCellColor(count) {
             if (count === 0) return COLOR_WHITE;
             
-            // Scaling Green (120) -> Red (0)
+            // Scaling: Dark Green -> Yellow -> Dark Red
             // 1 divisor = 120 (dark green)
             // maxDivisorsPossible divisors = 0 (dark red)
             
-            if (maxDivisorsPossible <= 1) return `hsl(120, 100%, 30%)`;
+            if (maxDivisorsPossible <= 1) return `rgb(0, 100, 0)`; // Dark Green
             
             let ratio;
             if (count <= 1) {
@@ -469,10 +469,26 @@
             if (ratio > 1) ratio = 1;
             if (ratio < 0) ratio = 0;
             
-            const hue = 120 * (1 - ratio);
-            // Use 30% lightness for a darker look across the scale
-            const lightness = 30; 
-            return `hsl(${hue}, 100%, ${lightness}%)`;
+            // Dark Green: (0, 100, 0)
+            // Yellow: (255, 255, 0)
+            // Dark Red: (139, 0, 0)
+            
+            let r, g, b;
+            if (ratio < 0.5) {
+                // Interpolate between Dark Green (0, 100, 0) and Yellow (255, 255, 0)
+                let t = ratio / 0.5;
+                r = Math.round(0 + (255 - 0) * t);
+                g = Math.round(100 + (255 - 100) * t);
+                b = 0;
+            } else {
+                // Interpolate between Yellow (255, 255, 0) and Dark Red (139, 0, 0)
+                let t = (ratio - 0.5) / 0.5;
+                r = Math.round(255 + (139 - 255) * t);
+                g = Math.round(255 + (0 - 255) * t);
+                b = 0;
+            }
+            
+            return `rgb(${r}, ${g}, ${b})`;
         }
 
         function drawCell(i) {
@@ -619,9 +635,9 @@
                 // If prime (or in normal mode), update Mertens product
                 if (isCurrentPrime && currentStep >= 2) {
                     // Feedback: only use primes from the first row (currentStep < GRID_COLS)
-                    if (currentStep < GRID_COLS) {
+                    //if (currentStep < GRID_COLS) {
                         mertensProduct *= (1 - 1/currentStep);
-                    }
+                    //}
                 }
 
                 // Find first multiple of currentStep >= START_NUMBER
