@@ -174,6 +174,11 @@
         </div>
 
         <div class="controls">
+            <!-- 0. Start Number -->
+            <div class="control-group">
+                <label>Start Number: <input type="number" id="startInput" value="0" min="0" style="background: rgba(255,255,255,0.1); border: 1px solid #555; color: #fff; padding: 2px 5px; border-radius: 3px; width: 80px;" onchange="resetGrid()"></label>
+            </div>
+
             <!-- 1. Columns (Width) -->
             <div class="control-group">
                 <label>Columns (Width): <span id="colsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
@@ -244,7 +249,8 @@
         // Grid dimensions
         let GRID_COLS = 10;
         let GRID_ROWS = 10;
-        let MAX_NUMBER = 99; // (COLS * ROWS) - 1
+        let START_NUMBER = 0;
+        let MAX_NUMBER = 99; // START_NUMBER + (COLS * ROWS) - 1
         
         const canvas = document.getElementById('gridCanvas');
         const ctx = canvas.getContext('2d', { alpha: false });
@@ -257,6 +263,7 @@
         const colsLabel = document.getElementById('colsLabel');
         const rowsLabel = document.getElementById('rowsLabel');
         const totalCellsLabel = document.getElementById('totalCellsLabel');
+        const startInput = document.getElementById('startInput');
         
         const legendMaxLabel = document.getElementById('legendMax');
         const hoverNumber = document.getElementById('hover-number');
@@ -300,19 +307,25 @@
         }
 
         function initGrid() {
-            MAX_NUMBER = (GRID_COLS * GRID_ROWS) - 1; 
-            touchCounts = new Int32Array(MAX_NUMBER + 1).fill(0);
+            START_NUMBER = parseInt(startInput.value) || 0;
+            MAX_NUMBER = START_NUMBER + (GRID_COLS * GRID_ROWS) - 1; 
+            touchCounts = new Int32Array(GRID_COLS * GRID_ROWS).fill(0);
             
             // Update UI
             colsLabel.textContent = GRID_COLS;
             rowsLabel.textContent = GRID_ROWS;
-            totalCellsLabel.textContent = MAX_NUMBER + 1;
+            totalCellsLabel.textContent = GRID_COLS * GRID_ROWS;
 
             // Reset statistics
             totalPrimesInRange = 0;
-            for(let i=0; i<=MAX_NUMBER; i++) if(isPrime(i)) totalPrimesInRange++;
+            for(let i=START_NUMBER; i<=MAX_NUMBER; i++) if(isPrime(i)) totalPrimesInRange++;
             statPrimes.textContent = totalPrimesInRange;
-            statApprox.textContent = Math.round(MAX_NUMBER / Math.log(MAX_NUMBER));
+            
+            // Approximation for primes up to MAX_NUMBER vs up to START_NUMBER
+            const approxMax = MAX_NUMBER > 1 ? MAX_NUMBER / Math.log(MAX_NUMBER) : 0;
+            const approxStart = START_NUMBER > 1 ? START_NUMBER / Math.log(START_NUMBER) : 0;
+            statApprox.textContent = Math.round(approxMax - approxStart);
+            
             mertensProduct = 1.0;
             updateStatsUI();
 
@@ -326,7 +339,7 @@
 
         function updateStatsUI() {
             let whiteCount = 0;
-            for(let i=0; i<=MAX_NUMBER; i++) if(touchCounts[i] === 0) whiteCount++;
+            for(let i=0; i<touchCounts.length; i++) if(touchCounts[i] === 0) whiteCount++;
             statWhite.textContent = whiteCount;
             // Mertens product multiplied by total cells (COLS * ROWS)
             statMertens.textContent = (mertensProduct * GRID_COLS * GRID_ROWS).toFixed(4);
@@ -391,17 +404,22 @@
         }
 
         function calculateMaxPossibleDivisors() {
-            let tempCounts = new Int32Array(MAX_NUMBER + 1).fill(0);
+            let tempCounts = new Int32Array(GRID_COLS * GRID_ROWS).fill(0);
             let localMax = 0;
+            // We need to check divisors up to MAX_NUMBER
             for (let step = 2; step <= MAX_NUMBER; step++) {
-                for (let i = 0; i <= MAX_NUMBER; i += step) {
-                    tempCounts[i]++;
+                // Find first multiple of 'step' >= START_NUMBER
+                let first = Math.ceil(START_NUMBER / step) * step;
+                if (first < step) first = step; // Don't start below the divisor itself if START_NUMBER is small
+                
+                for (let n = first; n <= MAX_NUMBER; n += step) {
+                    tempCounts[n - START_NUMBER]++;
                 }
             }
-            for (let i = 1; i <= MAX_NUMBER; i++) {
+            for (let i = 0; i < tempCounts.length; i++) {
                 if (tempCounts[i] > localMax) localMax = tempCounts[i];
             }
-            maxDivisorsPossible = localMax;
+            maxDivisorsPossible = Math.max(1, localMax);
             legendMaxLabel.textContent = maxDivisorsPossible;
         }
 
@@ -458,7 +476,8 @@
         }
 
         function drawCell(i) {
-            if (i > MAX_NUMBER) return;
+            const num = START_NUMBER + i;
+            if (num > MAX_NUMBER) return;
             
             const row = Math.floor(i / GRID_COLS);
             let col = i % GRID_COLS;
@@ -477,7 +496,7 @@
             ctx.fillStyle = getCellColor(count);
             ctx.fillRect(x, y, cellSize - gap, cellSize - gap);
 
-            if (i === currentStep && i <= MAX_NUMBER) {
+            if (num === currentStep && num <= MAX_NUMBER) {
                 ctx.lineWidth = Math.max(2, cellSize * 0.1);
                 ctx.strokeStyle = COLOR_HIGHLIGHT_BORDER;
                 ctx.strokeRect(x, y, cellSize - gap, cellSize - gap);
@@ -496,14 +515,14 @@
                 ctx.fillStyle = textColor;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(i, x + cellSize/2, y + cellSize/2);
+                ctx.fillText(num, x + cellSize/2, y + cellSize/2);
             }
         }
 
         function drawGrid() {
             ctx.fillStyle = COLOR_BG;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            for (let i = 0; i <= MAX_NUMBER; i++) {
+            for (let i = 0; i < (GRID_COLS * GRID_ROWS); i++) {
                 drawCell(i);
             }
         }
@@ -522,7 +541,8 @@
                 displayCol = (GRID_COLS - 1) - col;
             }
 
-            const number = (row * GRID_COLS) + displayCol;
+            const index = (row * GRID_COLS) + displayCol;
+            const number = START_NUMBER + index;
             
             // Check if coordinates are within valid grid
             if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS && number <= MAX_NUMBER) {
@@ -531,7 +551,7 @@
                 const factors = getPrimeFactors(number);
                 hoverFactors.innerHTML = factors;
 
-                const c = touchCounts[number];
+                const c = touchCounts[index];
                 let type = "";
                 let colorHex = getCellColor(c);
 
@@ -587,19 +607,29 @@
 
             // Sieve of Eratosthenes mode: only process primes
             let skipped = false;
-            if (checkSieve.checked && touchCounts[currentStep] > 0) {
+            
+            // For Sieve mode check: we need to know if currentStep has divisors
+            // However, currentStep might be outside our visible range [START_NUMBER, MAX_NUMBER]
+            // We need a way to check if currentStep is prime.
+            let isCurrentPrime = isPrime(currentStep);
+
+            if (checkSieve.checked && !isCurrentPrime) {
                 skipped = true;
             } else {
                 // If prime (or in normal mode), update Mertens product
-                if (touchCounts[currentStep] === 0 && currentStep >= 2) {
+                if (isCurrentPrime && currentStep >= 2) {
                     // Feedback: only use primes from the first row (currentStep < GRID_COLS)
                     if (currentStep < GRID_COLS) {
                         mertensProduct *= (1 - 1/currentStep);
                     }
                 }
 
-                for (let i = 0; i <= MAX_NUMBER; i += currentStep) {
-                    touchCounts[i]++;
+                // Find first multiple of currentStep >= START_NUMBER
+                let first = Math.ceil(START_NUMBER / currentStep) * currentStep;
+                if (first < currentStep) first = currentStep;
+
+                for (let n = first; n <= MAX_NUMBER; n += currentStep) {
+                    touchCounts[n - START_NUMBER]++;
                 }
             }
 
