@@ -184,7 +184,7 @@
                 <label>Columns (Width): <span id="colsLabel" style="color: #2ecc71; font-weight: bold;">10</span></label>
                 <div class="slider-container">
                     <button onclick="updateDimension('cols', -1)" class="slider-btn">-</button>
-                    <input type="range" id="colsSlider" min="5" max="210" step="1" value="10">
+                    <input type="range" id="colsSlider" min="2" max="210" step="1" value="10">
                     <button onclick="updateDimension('cols', 1)" class="slider-btn">+</button>
                 </div>
             </div>
@@ -206,6 +206,9 @@
             <div class="control-group" style="font-size: 13px; gap: 8px;">
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="checkSieve" onchange="resetGrid()"> Classic Sieve Mode
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="checkPrimeCount" onchange="resetGrid()"> Prime Factor Count Mode
                 </label>
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="checkAlternating" onchange="drawGrid()"> Alternating Layout (Boustrophedon)
@@ -274,6 +277,7 @@
         const btnAuto = document.getElementById('btnAuto');
         
         const checkSieve = document.getElementById('checkSieve');
+        const checkPrimeCount = document.getElementById('checkPrimeCount');
         const checkAlternating = document.getElementById('checkAlternating');
         const checkLinearColor = document.getElementById('checkLinearColor');
         const statWhite = document.getElementById('statWhite');
@@ -283,11 +287,13 @@
 
         // Data structures
         let touchCounts = []; 
+        let primeFactorCounts = [];
         let currentStep = 2; 
         let isAutoPlaying = false;
         let animationFrameId = null;
         let cellSize = 0;
         let maxDivisorsPossible = 10;
+        let maxPrimeFactorsPossible = 1;
         
         // Statistics
         let totalPrimesInRange = 0;
@@ -298,7 +304,21 @@
         const COLOR_WHITE = '#ffffff';
         const COLOR_HIGHLIGHT_BORDER = '#e74c3c'; 
 
+        // Optimization: Sieve for prime checking
+        let primeSieve = null;
+        function updatePrimeSieve(limit) {
+            primeSieve = new Uint8Array(limit + 1).fill(1);
+            primeSieve[0] = primeSieve[1] = 0;
+            for (let p = 2; p * p <= limit; p++) {
+                if (primeSieve[p]) {
+                    for (let i = p * p; i <= limit; i += p)
+                        primeSieve[i] = 0;
+                }
+            }
+        }
+
         function isPrime(n) {
+            if (primeSieve && n < primeSieve.length) return primeSieve[n] === 1;
             if (n < 2) return false;
             for (let i = 2; i * i <= n; i++) {
                 if (n % i === 0) return false;
@@ -310,7 +330,11 @@
             START_NUMBER = parseInt(startInput.value) || 0;
             MAX_NUMBER = START_NUMBER + (GRID_COLS * GRID_ROWS) - 1; 
             touchCounts = new Int32Array(GRID_COLS * GRID_ROWS).fill(0);
+            primeFactorCounts = new Int16Array(GRID_COLS * GRID_ROWS).fill(0);
             
+            // Optimization: Update prime sieve for the entire range
+            updatePrimeSieve(MAX_NUMBER);
+
             // Update UI
             colsLabel.textContent = GRID_COLS;
             rowsLabel.textContent = GRID_ROWS;
@@ -330,6 +354,9 @@
             updateStatsUI();
 
             calculateMaxPossibleDivisors();
+            if (checkPrimeCount.checked) {
+                calculateAllPrimeFactorCounts();
+            }
             resizeCanvas(); 
             
             updateNextButtonLabel();
@@ -350,7 +377,7 @@
         function updateDimension(type, delta) {
             if (type === 'cols') {
                 let newVal = parseInt(colsSlider.value) + delta;
-                newVal = Math.max(5, Math.min(newVal, 210));
+                newVal = Math.max(2, Math.min(newVal, 210));
                 colsSlider.value = newVal;
                 GRID_COLS = newVal;
             } else {
@@ -396,6 +423,12 @@
         // --- OTHER LOGIC ---
 
         function updateNextButtonLabel() {
+            if (checkPrimeCount.checked) {
+                btnNext.textContent = "Mode: Static";
+                btnNext.disabled = true;
+                btnAuto.disabled = true;
+                return;
+            }
             if (currentStep > MAX_NUMBER) {
                 btnNext.textContent = "Done";
             } else {
@@ -403,25 +436,63 @@
             }
         }
 
+        function countPrimeFactors(n) {
+            if (n < 2) return 0;
+            let count = 0;
+            let d = 2;
+            let temp = n;
+            while (d * d <= temp) {
+                while (temp % d === 0) {
+                    count++;
+                    temp /= d;
+                }
+                d++;
+            }
+            if (temp > 1) count++;
+            return count;
+        }
+
+        function calculateAllPrimeFactorCounts() {
+            let localMax = 0;
+            for (let i = 0; i < (GRID_COLS * GRID_ROWS); i++) {
+                let count = countPrimeFactors(START_NUMBER + i);
+                primeFactorCounts[i] = count;
+                if (count > localMax) localMax = count;
+            }
+            maxPrimeFactorsPossible = Math.max(1, localMax);
+            legendMaxLabel.textContent = maxPrimeFactorsPossible;
+        }
+
         function calculateMaxPossibleDivisors() {
+            if (checkSieve.checked) {
+                maxDivisorsPossible = 1;
+                legendMaxLabel.textContent = "-";
+                return;
+            }
+            if (checkPrimeCount.checked) {
+                return; // Logic handled in calculateAllPrimeFactorCounts
+            }
+
+            // Optimization: Use optimized loop for large grids.
             let tempCounts = new Int32Array(GRID_COLS * GRID_ROWS).fill(0);
             let localMax = 0;
-            // We need to check divisors up to MAX_NUMBER
+            
             for (let step = 2; step <= MAX_NUMBER; step++) {
-                // Find first multiple of 'step' >= START_NUMBER
                 let first = Math.ceil(START_NUMBER / step) * step;
-                if (first < step) first = step; // Don't start below the divisor itself if START_NUMBER is small
+                if (first < step) first = step;
                 
                 for (let n = first; n <= MAX_NUMBER; n += step) {
                     tempCounts[n - START_NUMBER]++;
                 }
             }
+            
             for (let i = 0; i < tempCounts.length; i++) {
                 if (tempCounts[i] > localMax) localMax = tempCounts[i];
             }
             maxDivisorsPossible = Math.max(1, localMax);
             legendMaxLabel.textContent = maxDivisorsPossible;
         }
+
 
         function getPrimeFactors(n) {
             if (n === 0) return "Zero";
@@ -443,13 +514,27 @@
             }).join(' × ');
         }
 
-        function getCellColor(count) {
+        function getCellColor(count, number, index) {
+            // Sieve mode: Binary color logic
+            if (checkSieve.checked) {
+                if (number < 2) return COLOR_WHITE;
+                if (isPrime(number)) return 'rgb(0, 100, 0)'; // Dark Green
+                if (count > 0) return 'rgb(139, 0, 0)'; // Dark Red
+                return COLOR_WHITE;
+            }
+
+            if (checkPrimeCount.checked) {
+                const pc = primeFactorCounts[index];
+                if (pc === 0) return COLOR_WHITE;
+                
+                // Color mapping: 1 (Prime) -> Dark Green, Max -> Dark Red
+                let ratio = (maxPrimeFactorsPossible > 1) ? (pc - 1) / (maxPrimeFactorsPossible - 1) : 0;
+                return interpolateColor(ratio);
+            }
+
             if (count === 0) return COLOR_WHITE;
-            
-            // Scaling: Dark Green -> Yellow -> Dark Red
-            // 1 divisor = 120 (dark green)
-            // maxDivisorsPossible divisors = 0 (dark red)
-            
+
+            // Heatmap mode: Scaling (Dark Green -> Yellow -> Dark Red)
             if (maxDivisorsPossible <= 1) return `rgb(0, 100, 0)`; // Dark Green
             
             let ratio;
@@ -465,7 +550,10 @@
                     ratio = Math.log(count) / maxLog;
                 }
             }
-            
+            return interpolateColor(ratio);
+        }
+
+        function interpolateColor(ratio) {
             if (ratio > 1) ratio = 1;
             if (ratio < 0) ratio = 0;
             
@@ -491,6 +579,7 @@
             return `rgb(${r}, ${g}, ${b})`;
         }
 
+
         function drawCell(i) {
             const num = START_NUMBER + i;
             if (num > MAX_NUMBER) return;
@@ -509,7 +598,7 @@
 
             const count = touchCounts[i];
             
-            ctx.fillStyle = getCellColor(count);
+            ctx.fillStyle = getCellColor(count, num, i);
             ctx.fillRect(x, y, cellSize - gap, cellSize - gap);
 
             if (num === currentStep && num <= MAX_NUMBER) {
@@ -569,29 +658,50 @@
 
                 const c = touchCounts[index];
                 let type = "";
-                let colorHex = getCellColor(c);
+                let colorHex = getCellColor(c, number, index);
 
-                if (c === 0) type = "Untouched (1)";
-                else if (c === 1) type = "Prime Number (Green)";
-                else type = "Composite (Scale)";
-                
-                let percent = 0;
-                if (c >= 1) {
-                    if (checkLinearColor.checked) {
-                        percent = Math.round(((c-1)/(maxDivisorsPossible-1))*100);
-                    } else {
-                        percent = Math.round(((Math.log(c))/(Math.log(maxDivisorsPossible)))*100);
+                if (checkPrimeCount.checked) {
+                    const pc = primeFactorCounts[index];
+                    if (pc === 0) type = "Untouched (0/1)";
+                    else if (pc === 1) type = "Prime Number (Green)";
+                    else type = "Composite (Scale)";
+
+                    let percent = 0;
+                    if (pc >= 1 && maxPrimeFactorsPossible > 1) {
+                        percent = Math.round(((pc - 1) / (maxPrimeFactorsPossible - 1)) * 100);
                     }
-                }
 
-                hoverDetails.innerHTML = `
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
-                        <div style="width:20px; height:20px; background:${colorHex}; border:1px solid #555;"></div>
-                        <span>${type}</span>
-                    </div>
-                    Number of divisors (excl. 1): <b>${c}</b><br>
-                    ${c >= 1 ? `Intensity: ${percent}%` : ''}
-                `;
+                    hoverDetails.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+                            <div style="width:20px; height:20px; background:${colorHex}; border:1px solid #555;"></div>
+                            <span>${type}</span>
+                        </div>
+                        Number of prime factors Ω(n): <b>${pc}</b><br>
+                        ${pc >= 1 ? `Intensity: ${percent}%` : ''}
+                    `;
+                } else {
+                    if (c === 0) type = "Untouched (1)";
+                    else if (c === 1) type = "Prime Number (Green)";
+                    else type = "Composite (Scale)";
+                    
+                    let percent = 0;
+                    if (c >= 1) {
+                        if (checkLinearColor.checked) {
+                            percent = Math.round(((c-1)/(maxDivisorsPossible-1))*100);
+                        } else {
+                            percent = Math.round(((Math.log(c))/(Math.log(maxDivisorsPossible)))*100);
+                        }
+                    }
+
+                    hoverDetails.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+                            <div style="width:20px; height:20px; background:${colorHex}; border:1px solid #555;"></div>
+                            <span>${type}</span>
+                        </div>
+                        Number of divisors (excl. 1): <b>${c}</b><br>
+                        ${c >= 1 ? `Intensity: ${percent}%` : ''}
+                    `;
+                }
             }
         });
 
@@ -609,24 +719,41 @@
             initGrid();
         }
 
-        function performStep() {
+        function performStep(skipRedraw = false) {
+            if (checkPrimeCount.checked) {
+                updateStatus("Prime Factor Count mode is static. No investigation steps.");
+                return false;
+            }
+            // Optimization for Sieve mode: stop at sqrt(MAX_NUMBER)
+            if (checkSieve.checked && currentStep * currentStep > MAX_NUMBER) {
+                updateStatus(`Sieve finished at sqrt(${MAX_NUMBER}) ≈ ${Math.floor(Math.sqrt(MAX_NUMBER))}. All primes found.`);
+                currentStep = MAX_NUMBER + 1; // Mark as done
+                stopAutoPlay();
+                btnNext.disabled = true;
+                btnAuto.disabled = true;
+                updateNextButtonLabel();
+                if (!skipRedraw) {
+                    drawGrid(); 
+                    updateStatsUI();
+                }
+                return false;
+            }
+
             if (currentStep > MAX_NUMBER) {
                 updateStatus("Done! Investigation finished.");
                 stopAutoPlay();
                 btnNext.disabled = true;
                 btnAuto.disabled = true;
                 updateNextButtonLabel();
-                drawGrid(); 
-                updateStatsUI();
+                if (!skipRedraw) {
+                    drawGrid(); 
+                    updateStatsUI();
+                }
                 return false;
             }
 
             // Sieve of Eratosthenes mode: only process primes
             let skipped = false;
-            
-            // For Sieve mode check: we need to know if currentStep has divisors
-            // However, currentStep might be outside our visible range [START_NUMBER, MAX_NUMBER]
-            // We need a way to check if currentStep is prime.
             let isCurrentPrime = isPrime(currentStep);
 
             if (checkSieve.checked && !isCurrentPrime) {
@@ -634,31 +761,39 @@
             } else {
                 // If prime (or in normal mode), update Mertens product
                 if (isCurrentPrime && currentStep >= 2) {
-                    // Feedback: only use primes from the first row (currentStep < GRID_COLS)
-                    //if (currentStep < GRID_COLS) {
-                        mertensProduct *= (1 - 1/currentStep);
-                    //}
+                    mertensProduct *= (1 - 1/currentStep);
                 }
 
                 // Find first multiple of currentStep >= START_NUMBER
                 let first = Math.ceil(START_NUMBER / currentStep) * currentStep;
+                
+                // If we are sieving (sieve mode or we found a prime in heatmap mode),
+                // we should start from currentStep*currentStep for efficiency if we are 
+                // doing classic sieve. But here we count all divisors, so:
                 if (first < currentStep) first = currentStep;
+                // If classic sieve: start from p*p
+                if (checkSieve.checked) {
+                    first = Math.max(first, currentStep * currentStep);
+                }
 
                 for (let n = first; n <= MAX_NUMBER; n += currentStep) {
                     touchCounts[n - START_NUMBER]++;
                 }
             }
 
-            if (!skipped) {
-                updateStatus(`Step: ${currentStep} done. (${Math.floor((currentStep/MAX_NUMBER)*100)}%)`);
-            } else {
-                updateStatus(`Step: ${currentStep} skipped (composite).`);
+            if (!skipRedraw) {
+                if (!skipped) {
+                    updateStatus(`Step: ${currentStep} done. (${Math.floor((currentStep/MAX_NUMBER)*100)}%)`);
+                } else {
+                    updateStatus(`Step: ${currentStep} skipped (composite).`);
+                }
+                
+                updateNextButtonLabel(); 
+                drawGrid(); 
+                updateStatsUI();
             }
             
             currentStep++;
-            updateNextButtonLabel(); 
-            drawGrid(); 
-            updateStatsUI();
             return true;
         }
 
@@ -692,17 +827,28 @@
 
             let totalCells = GRID_COLS * GRID_ROWS;
             let stepsPerFrame = 1;
-            if (totalCells > 900) stepsPerFrame = 2;
-            if (totalCells > 3600) stepsPerFrame = 10;
-            if (totalCells > 10000) stepsPerFrame = 50;
-            if (totalCells > 22500) stepsPerFrame = 100;
+            if (totalCells > 900) stepsPerFrame = 5;
+            if (totalCells > 3600) stepsPerFrame = 20;
+            if (totalCells > 10000) stepsPerFrame = 100;
+            if (totalCells > 22500) stepsPerFrame = 250;
 
+            let continuing = true;
             for (let k = 0; k < stepsPerFrame; k++) {
-                const continuing = performStep();
-                if (!continuing) return;
+                continuing = performStep(true); // Skip redrawing inside the loop
+                if (!continuing) break;
             }
 
-            animationFrameId = requestAnimationFrame(autoPlayLoop);
+            // Update UI once per frame
+            if (continuing) {
+                updateStatus(`Step: ${currentStep-1} done. (${Math.floor(((currentStep-1)/MAX_NUMBER)*100)}%)`);
+            }
+            updateNextButtonLabel();
+            drawGrid();
+            updateStatsUI();
+
+            if (continuing) {
+                animationFrameId = requestAnimationFrame(autoPlayLoop);
+            }
         }
 
         // Initialize
